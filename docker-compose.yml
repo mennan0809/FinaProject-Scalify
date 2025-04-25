@@ -1,0 +1,93 @@
+version: '3.8'
+services:
+  user-service:
+    build: ./userService
+    ports:
+      - "8001:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/user_db
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+    depends_on:
+      - user-db
+
+  user-db:
+    image: postgres
+    environment:
+      - POSTGRES_DB=user_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+
+  product-service:
+    build: ./productService
+    ports:
+      - "8002:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://product-db:5432/product_db
+      - SPRING_DATASOURCE_USERNAME=product
+      - SPRING_DATASOURCE_PASSWORD=password
+      - MONGODB_URI=mongodb://product-review-db:27017/product_reviews
+    depends_on:
+      - product-db
+      - product-review-db
+
+  product-db:
+    image: postgres
+    environment:
+      - POSTGRES_DB=product_db
+      - POSTGRES_USER=product
+      - POSTGRES_PASSWORD=password
+
+  product-review-db:
+    image: mongo
+
+  order-service:
+    build: ./orderService
+    ports:
+      - "8003:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://order-db:5432/order_db
+      - SPRING_DATASOURCE_USERNAME=order
+      - SPRING_DATASOURCE_PASSWORD=password
+      - REDIS_HOST=order-cache
+    depends_on:
+      - order-db
+      - order-cache
+
+  order-db:
+    image: postgres
+    environment:
+      - POSTGRES_DB=order_db
+      - POSTGRES_USER=order
+      - POSTGRES_PASSWORD=password
+
+  order-cache:
+    image: redis
+
+  payment-service:
+    build: ./paymentService
+    ports:
+      - "8004:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://payment-db:5432/payment_db
+      - SPRING_DATASOURCE_USERNAME=payment
+      - SPRING_DATASOURCE_PASSWORD=password
+    depends_on:
+      - payment-db
+      - rabbitmq
+
+  payment-db:
+    image: postgres
+    environment:
+      - POSTGRES_DB=payment_db
+      - POSTGRES_USER=payment
+      - POSTGRES_PASSWORD=password
+
+  rabbitmq:
+    image: rabbitmq:4.0-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
