@@ -53,5 +53,18 @@ public class UserController {
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
+    @PostMapping("/reset")
+    public void resetPassword(@RequestParam String token, @RequestParam String newPassword) {
+        userService.resetPassword(token, newPassword);
+    }
 
+    @GetMapping("/verify-email")
+    public ResponseEntity<String> verifyEmail(@RequestParam("token") String token) {
+        boolean isVerified = userService.verifyEmail(token);
+        if (isVerified) {
+            return ResponseEntity.ok("Email verified successfully.");
+        } else {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid or expired token.");
+        }
+    }
 }
