@@ -5,10 +5,14 @@ import com.ecommerce.UserService.models.enums.UserRole;
 import com.ecommerce.UserService.repositories.PasswordResetTokenRepository;
 import com.ecommerce.UserService.repositories.UserRepository;
 import com.ecommerce.UserService.services.factory.UserFactory;
+import com.ecommerce.UserService.services.singleton.SessionManager;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ecommerce.UserService.authUtilities.JwtUtil;
+
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -23,6 +27,9 @@ public class UserService {
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailService emailService;
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
+    @Autowired private RedisTemplate<String, UserSession> redisTemplate;
+    @Autowired private JwtUtil jwtUtil;
+
 
     private User getUserOrThrow(String token, Long id) {
         User user= userRepository.findById(id)
@@ -153,5 +160,87 @@ public class UserService {
         user.setEmailVerificationToken(null);
         userRepository.save(user);
         return true;
+    }
+
+
+    public boolean isTokenValid(String token) {
+        return SessionManager.getInstance().isTokenValid(token);
+    }
+
+    private UserSession getSessionOrThrow(String token) {
+        UserSession session = redisTemplate.opsForValue().get(token);
+        if (session == null) {
+            throw new IllegalStateException("Invalid session or user not logged in.");
+        }
+        return session;
+    }
+
+    public UserSession getSessionByToken(String token) {
+        return getSessionOrThrow(token);
+    }
+
+    @Transactional
+    public String loginUser(String username, String password) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials."));
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new IllegalArgumentException("Invalid credentials.");
+        }
+
+        if(user.isBanned()){
+            throw new IllegalStateException("User is banned.");
+        }
+
+        if (!user.getRole().equalsIgnoreCase("ADMIN") && !user.isEmailVerified()) {
+            throw new IllegalStateException("Please verify your email before logging in.");
+        }
+
+        if (SessionManager.getInstance().getSessionByUserId(user.getId()) != null) {
+            throw new IllegalStateException("User already logged in.");
+        }
+
+        String token = jwtUtil.generateToken(user.getId(), user.getRole());
+        UserSession session = new UserSession(token, user.getId(), user.getRole(), user.getEmail());
+        redisTemplate.opsForValue().set(token, session);
+        SessionManager.getInstance().addSession(token, session);
+
+        return token;
+    }
+
+    public void logoutUser(String token) {
+        UserSession session = SessionManager.getInstance().getSession(token);
+        if (session == null) {
+            throw new IllegalStateException("Invalid or expired token.");
+        }
+        redisTemplate.delete(token);
+        SessionManager.getInstance().invalidateToken(token);
+    }
+
+
+    @Transactional
+    public void banUser(Long id, String token) {
+        UserSession session = getSessionOrThrow(token);
+
+        if (!session.getRole().equalsIgnoreCase("ADMIN")) {
+            throw new IllegalStateException("Only admins can ban users.");
+        }
+
+        User user = getUserOrThrow(token, id);
+        user.setBanned(true);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void unbanUser(Long id, String token) {
+        UserSession session = getSessionOrThrow(token);
+
+        if (!session.getRole().equalsIgnoreCase("ADMIN")) {
+            throw new IllegalStateException("Only admins can unban users.");
+        }
+
+        User user = getUserOrThrow(token, id);
+        user.setBanned(false);
+        userRepository.save(user);
     }
 }
