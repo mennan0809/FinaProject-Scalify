@@ -1,12 +1,14 @@
 package com.ecommerce.UserService.controllers;
 
 import com.ecommerce.UserService.models.User;
+import com.ecommerce.UserService.models.UserSession;
 import com.ecommerce.UserService.models.enums.UserRole;
 import com.ecommerce.UserService.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -66,5 +68,77 @@ public class UserController {
         } else {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid or expired token.");
         }
+    }
+
+    @PostMapping("/login")
+    public String login(@RequestBody Map<String, String> credentials) {
+        String username = credentials.get("username");
+        String password = credentials.get("password");
+        return userService.loginUser(username, password);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<String> logoutUser(@RequestHeader("Authorization") String token) {
+        try {
+            String actualToken = extractToken(token);
+
+            if (!isTokenValid(actualToken)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+            }
+
+            userService.logoutUser(actualToken);
+            return ResponseEntity.ok("User logged out successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error logging out: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/session")
+    public ResponseEntity<UserSession> getSessionFromToken(@RequestHeader("Authorization") String token) {
+        try {
+            String actualToken = extractToken(token);
+
+            if (actualToken == null || !userService.isTokenValid(actualToken)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);  // Invalid or expired token
+            }
+
+            UserSession session = userService.getSessionByToken(actualToken);
+
+            if (session != null) {
+                return ResponseEntity.ok(session);  // Return userId if valid
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);  // Token is valid but userId is not found
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);  // Handle other errors
+        }
+    }
+
+    @PutMapping("/ban/{id}")
+    public ResponseEntity<Void> banUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
+        String token = extractToken(authorizationHeader);
+
+        if (!isTokenValid(token)) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        userService.banUser(id, token);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    private boolean isTokenValid(String token) {
+        return token != null && userService.isTokenValid(token);
+    }
+
+    @PutMapping("/unban/{id}")
+    public ResponseEntity<Void> unbanUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
+        String token = extractToken(authorizationHeader);
+
+        if (!isTokenValid(token)) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        userService.unbanUser(id, token);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 }
