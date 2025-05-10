@@ -2,6 +2,7 @@ package com.ecommerce.UserService.services;
 
 import com.ecommerce.UserService.models.*;
 import com.ecommerce.UserService.models.enums.UserRole;
+import com.ecommerce.UserService.repositories.PasswordResetTokenRepository;
 import com.ecommerce.UserService.repositories.UserRepository;
 import com.ecommerce.UserService.services.factory.UserFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,8 +10,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class UserService {
@@ -18,6 +21,8 @@ public class UserService {
     @Autowired private UserRepository userRepository;
     @Autowired private UserFactory userFactory;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private EmailService emailService;
+    @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
 
     private User getUserOrThrow(String token, Long id) {
         User user= userRepository.findById(id)
@@ -106,4 +111,47 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
     }
 
+
+
+
+
+
+
+
+    public void requestPasswordReset(String username) {
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("No user found with the provided email."));
+        PasswordResetToken resetToken = new PasswordResetToken(
+                UUID.randomUUID().toString(),
+                user,
+                LocalDateTime.now().plusHours(1)
+        );
+        passwordResetTokenRepository.save(resetToken);
+        emailService.sendPasswordResetEmail(user.getEmail(), resetToken.getToken());
+    }
+
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        PasswordResetToken resetToken = getValidPasswordResetToken(token);
+        User user = resetToken.getUser();
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        passwordResetTokenRepository.delete(resetToken);
+    }
+
+    private PasswordResetToken getValidPasswordResetToken(String token) {
+        return passwordResetTokenRepository.findByToken(token)
+                .filter(t -> t.getExpiryDate().isAfter(LocalDateTime.now()))
+                .orElseThrow(() -> new IllegalStateException("Invalid or expired password reset token."));
+    }
+
+    public boolean verifyEmail(String token) {
+        User user = userRepository.findByEmailVerificationToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid verification token."));
+        user.setEmailVerified(true);
+        user.setEmailVerificationToken(null);
+        userRepository.save(user);
+        return true;
+    }
 }
