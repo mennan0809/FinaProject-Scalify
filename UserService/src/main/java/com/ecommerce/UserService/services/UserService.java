@@ -7,6 +7,7 @@ import com.ecommerce.UserService.repositories.UserRepository;
 import com.ecommerce.UserService.services.factory.UserFactory;
 import com.ecommerce.UserService.services.singleton.SessionManager;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,8 @@ import java.util.UUID;
 @Service
 public class UserService {
 
+    private static final String ROLE_ADMIN = "ADMIN";
+
     @Autowired private UserRepository userRepository;
     @Autowired private UserFactory userFactory;
     @Autowired private PasswordEncoder passwordEncoder;
@@ -34,24 +37,42 @@ public class UserService {
     private User getUserOrThrow(String token, Long id) {
         User user= userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
+        UserSession session = getSessionOrThrow(token);
+        if (!session.getRole().equalsIgnoreCase(ROLE_ADMIN)&&!user.getId().equals(session.getUserId())) {
+            throw new IllegalStateException("You are not to access this user info.");
+        }
         return user;
     }
+
     // REGISTRATION
     @Transactional
     public User registerUser(UserRole role, Object userData) {
         User user = userFactory.createUser(role, userData);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
+        user.setEmailVerificationToken(UUID.randomUUID().toString());
         userRepository.save(user);
+        emailService.sendEmailVerification(user.getEmail(), user.getEmailVerificationToken());
         return user;
     }
 
     // USER MANAGEMENT
     public Optional<User> getUserById(Long id, String token) {
-        return userRepository.findById(id);
+        UserSession session = getSessionOrThrow(token);
+        if (session.getRole().equalsIgnoreCase("ADMIN") || session.getUserId().equals(id)) {
+            return userRepository.findById(id);
+        } else {
+            throw new IllegalStateException("Unauthorized access.");
+        }
     }
 
     @Transactional
     public User updateUser(Long id, Object updatedData, String token) {
+        UserSession session = getSessionOrThrow(token);
+
+        if (!session.getRole().equalsIgnoreCase("ADMIN") && !session.getUserId().equals(id)) {
+            throw new IllegalStateException("Unauthorized update attempt.");
+        }
+
         User existingUser = getUserOrThrow(token, id);
 
         // If the data is a Map of fields
@@ -110,7 +131,22 @@ public class UserService {
 
     @Transactional
     public void deleteUser(Long id, String token) {
-        userRepository.deleteById(id);
+        UserSession session = getSessionOrThrow(token);
+
+        if (!session.getRole().equalsIgnoreCase("ADMIN")) {
+            throw new IllegalStateException("Only admins can delete users.");
+        }
+        try {
+            userRepository.deleteById(id);
+        } catch (EmptyResultDataAccessException ignored) {
+            // Don't care, already deleted
+        }
+    }
+
+    @Transactional
+    public void deleteMyAccount(String token) {
+        UserSession session = getSessionOrThrow(token);
+        userRepository.findById(session.getUserId()).ifPresent(userRepository::delete);
     }
 
     private User getUser(Long id) {
@@ -142,6 +178,10 @@ public class UserService {
     public void resetPassword(String token, String newPassword) {
         PasswordResetToken resetToken = getValidPasswordResetToken(token);
         User user = resetToken.getUser();
+        UserSession session = getSessionOrThrow(token);
+        if (!user.getId().equals(session.getUserId())) {
+            throw new IllegalStateException("You are not to access this user info.");
+        }
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         passwordResetTokenRepository.delete(resetToken);

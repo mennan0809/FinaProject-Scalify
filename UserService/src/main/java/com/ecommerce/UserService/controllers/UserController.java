@@ -36,6 +36,10 @@ public class UserController {
     @GetMapping("/{id}")
     public ResponseEntity<User> getUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
         String token = extractToken(authorizationHeader);
+        if (!isTokenValid(token)) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
         Optional<User> user = userService.getUserById(id, token);
         return user.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
@@ -44,6 +48,10 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody Object userData, @RequestHeader("Authorization") String authorizationHeader) {
         String token = extractToken(authorizationHeader);
+        if (!isTokenValid(token)) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
         User updated = userService.updateUser(id, userData, token);
         return new ResponseEntity<>(updated, HttpStatus.OK);
     }
@@ -51,6 +59,11 @@ public class UserController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
         String token = extractToken(authorizationHeader);
+
+        if (!isTokenValid(token)) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
         userService.deleteUser(id, token);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
