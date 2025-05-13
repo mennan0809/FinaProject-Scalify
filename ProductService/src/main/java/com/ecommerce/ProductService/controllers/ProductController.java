@@ -164,4 +164,46 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
         }
     }
+
+
+    @PostMapping("/{productId}/reviews")
+    public ResponseEntity<?> addReview(
+            @PathVariable Long productId,
+            @RequestBody ProductReview review,
+            @RequestHeader("Authorization") String authorizationHeader) {
+
+        try {
+            String token = extractToken(authorizationHeader);
+            UserSessionDTO userSession = productService.getUserSessionFromToken(token);
+            if (userSession == null || !"CUSTOMER".equals(userSession.getRole())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add reviews.");
+            }
+
+            ProductReview createdReview = productService.addReview(productId, review);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdReview);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{productId}/reviews")
+    public ResponseEntity<?> getReviews(@PathVariable Long productId) {
+        try {
+            List<ProductReview> reviews = productService.getReviews(productId);
+            return ResponseEntity.ok(reviews);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{productId}/average-rating")
+    public ResponseEntity<?> getAverageRating(@PathVariable Long productId) {
+        try {
+            double avgRating = productService.getAverageRating(productId);
+            return ResponseEntity.ok(avgRating);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+        }
+    }
 }
