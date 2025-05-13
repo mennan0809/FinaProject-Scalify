@@ -283,4 +283,21 @@ public class UserService {
         user.setBanned(false);
         userRepository.save(user);
     }
+    @Transactional
+    public void deposit(Long userId, Double amount) {
+        CustomerProfile customer = (CustomerProfile) getUser(userId);
+
+        customer.setWallet(customer.getWallet() + amount);
+        userRepository.save(customer);
+    }
+
+    @Transactional
+    public void deduct(String token, Long userId, Double amount) {
+        getSessionOrThrow(token);
+
+        CustomerProfile customer = (CustomerProfile) getUser(userId);
+
+        customer.setWallet(amount);
+        userRepository.save(customer);
+    }
 }
