@@ -20,7 +20,7 @@ public class UserFactory {
             }
             case ADMIN -> {
                 AdminProfile admin = new AdminProfile();
-                User adminUser = (User) userData;
+                User adminUser = (User) userData;  // cast userData to User
                 admin.setUsername(adminUser.getUsername());
                 admin.setEmail(adminUser.getEmail());
                 admin.setPassword(adminUser.getPassword());
@@ -30,4 +30,3 @@ public class UserFactory {
         };
     }
 }
-

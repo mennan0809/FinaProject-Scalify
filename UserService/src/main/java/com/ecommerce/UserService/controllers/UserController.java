@@ -92,25 +92,39 @@ public class UserController {
     }
 
     @PostMapping("/reset")
-    public void resetPassword(@RequestParam String token, @RequestParam String newPassword) {
-        userService.resetPassword(token, newPassword);
+    public ResponseEntity<String> resetPassword(@RequestParam String token, @RequestParam String newPassword) {
+        try {
+            userService.resetPassword(token, newPassword);
+            return ResponseEntity.ok("Password has been reset.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Reset failed: " + e.getMessage());
+        }
     }
 
     @GetMapping("/verify-email")
     public ResponseEntity<String> verifyEmail(@RequestParam("token") String token) {
-        boolean isVerified = userService.verifyEmail(token);
-        if (isVerified) {
-            return ResponseEntity.ok("Email verified successfully.");
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid or expired token.");
+        try {
+            boolean isVerified = userService.verifyEmail(token);
+            if (isVerified) {
+                return ResponseEntity.ok("Email verified successfully.");
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid or expired token.");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Verification failed: " + e.getMessage());
         }
     }
 
     @PostMapping("/login")
-    public String login(@RequestBody Map<String, String> credentials) {
-        String username = credentials.get("username");
-        String password = credentials.get("password");
-        return userService.loginUser(username, password);
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+        try {
+            String username = credentials.get("username");
+            String password = credentials.get("password");
+            String token = userService.loginUser(username, password);
+            return ResponseEntity.ok(token);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login failed: " + e.getMessage());
+        }
     }
 
     @PostMapping("/logout")
@@ -124,58 +138,65 @@ public class UserController {
 
             userService.logoutUser(actualToken);
             return ResponseEntity.ok("User logged out successfully");
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error logging out: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Logout failed: " + e.getMessage());
         }
     }
 
     @GetMapping("/session")
-    public ResponseEntity<UserSession> getSessionFromToken(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> getSessionFromToken(@RequestHeader("Authorization") String token) {
         try {
             String actualToken = extractToken(token);
 
-            if (actualToken == null || !userService.isTokenValid(actualToken)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);  // Invalid or expired token
+            if (!isTokenValid(actualToken)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
             }
 
             UserSession session = userService.getSessionByToken(actualToken);
-
             if (session != null) {
-                return ResponseEntity.ok(session);  // Return userId if valid
+                return ResponseEntity.ok(session);
             } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);  // Token is valid but userId is not found
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Session not found.");
             }
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);  // Handle other errors
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error retrieving session: " + e.getMessage());
         }
     }
 
     @PutMapping("/ban/{id}")
-    public ResponseEntity<Void> banUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
-        String token = extractToken(authorizationHeader);
+    public ResponseEntity<String> banUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            String token = extractToken(authorizationHeader);
+            if (!isTokenValid(token)) {
+                return new ResponseEntity<>("Unauthorized - invalid token", HttpStatus.UNAUTHORIZED);
+            }
 
-        if (!isTokenValid(token)) {
-            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+            userService.banUser(id, token);
+            return new ResponseEntity<>("User banned", HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Ban failed: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
+    }
 
-        userService.banUser(id, token);
-        return new ResponseEntity<>(HttpStatus.OK);
+    @PutMapping("/unban/{id}")
+    public ResponseEntity<String> unbanUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            String token = extractToken(authorizationHeader);
+            if (!isTokenValid(token)) {
+                return new ResponseEntity<>("Unauthorized - invalid token", HttpStatus.UNAUTHORIZED);
+            }
+
+            userService.unbanUser(id, token);
+            return new ResponseEntity<>("User unbanned", HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Unban failed: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
     }
 
     private boolean isTokenValid(String token) {
         return token != null && userService.isTokenValid(token);
-    }
-
-    @PutMapping("/unban/{id}")
-    public ResponseEntity<Void> unbanUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
-        String token = extractToken(authorizationHeader);
-
-        if (!isTokenValid(token)) {
-            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
-        }
-
-        userService.unbanUser(id, token);
-        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @PostMapping("/deposit/{userId}")
@@ -213,6 +234,16 @@ public class UserController {
 
         } catch (Exception e) {
             return new ResponseEntity<>("Error deleting account: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/reset-request")
+    public ResponseEntity<String> requestPasswordReset(@RequestParam String username) {
+        try {
+            userService.requestPasswordReset(username);
+            return ResponseEntity.ok("Password reset link sent.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Reset request failed: " + e.getMessage());
         }
     }
 
