@@ -206,4 +206,14 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
         }
     }
+
+    @GetMapping("/filter")
+    public ResponseEntity<?> filterByPriceRange(@RequestParam double min, @RequestParam double max) {
+        try {
+            List<Product> products = productService.filterProductsByPrice(min, max);
+            return ResponseEntity.ok(products);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+        }
+    }
 }

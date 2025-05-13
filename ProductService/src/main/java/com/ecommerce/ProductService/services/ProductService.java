@@ -30,10 +30,10 @@ public class ProductService {
 
     private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
 
-
     @Autowired
-    public ProductService(RedisTemplate<String, UserSessionDTO> sessionRedisTemplate) {
+    public ProductService(StockAlertObserver observer, RedisTemplate<String, UserSessionDTO> sessionRedisTemplate) {
         this.sessionRedisTemplate = sessionRedisTemplate;
+        subject.registerObserver(observer);
     }
 
     public String getToken(String token) {
@@ -161,6 +161,11 @@ public class ProductService {
             }
         }
 
+        // Notify observers if subject is initialized
+        if (subject != null) {
+            subject.notifyObservers(alertEmail, updatedProduct);
+        }
+
         return productRepository.save(existingProduct);
     }
 
@@ -188,6 +193,10 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        if (subject != null) {
+            subject.notifyObservers(alertEmail,updatedProduct);
+        }
+
         return updatedProduct; // Return the updated product
     }
     public void removeStock(String alertEmail,Long id, int stock) {
@@ -205,6 +214,9 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        if (subject != null) {
+            subject.notifyObservers(alertEmail,updatedProduct);
+        }
 
     }
 
@@ -249,5 +261,8 @@ public class ProductService {
                 .orElse(0.0);
     }
 
+    public List<Product> filterProductsByPrice(double min, double max) {
+        return productRepository.findByPriceBetween(min, max);
+    }
 
 }
