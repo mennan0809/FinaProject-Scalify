@@ -1,4 +1,10 @@
 package com.ecommerce.OrderService.models.enums;
 
-public class OrderStatus {
+public enum OrderStatus {
+    CONFIRMED,
+    SHIPPED,
+    DELIVERED,
+    CANCELLED,
+    REFUNDED,
+    REFUND_PENDING
 }
