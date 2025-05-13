@@ -283,7 +283,6 @@ public class UserService {
         user.setBanned(false);
         userRepository.save(user);
     }
-
     @Transactional
     public void deposit(Long userId, Double amount) {
         CustomerProfile customer = (CustomerProfile) getUser(userId);
