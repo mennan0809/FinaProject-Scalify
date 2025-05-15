@@ -2,6 +2,7 @@ package com.ecommerce.PaymentService.services;
 import com.ecommerce.PaymentService.clients.UserServiceClient;
 import com.ecommerce.PaymentService.dto.UserDto;
 import com.ecommerce.PaymentService.dto.UserSessionDTO;
+import com.ecommerce.PaymentService.models.OrderMessage;
 import com.ecommerce.PaymentService.models.Payment;
 import com.ecommerce.PaymentService.models.enums.PaymentMethod;
 import com.ecommerce.PaymentService.models.enums.PaymentStatus;
@@ -21,12 +22,19 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+
 @Service
 public class PaymentService {
     private final PaymentRepository paymentRepository;
 
     @Autowired
     private MailService mailService;
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
+    @Value("${order.queue.name}")
+    private String orderQueue;
+
     private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
     @Autowired
     private PaymentStrategyFactory paymentStrategyFactory;
@@ -47,10 +55,8 @@ public class PaymentService {
         return userSession.toString();
     }
     public UserSessionDTO getUserSessionFromToken(String token) {
-        // Retrieve the user session from Redis using the provided token
         UserSessionDTO userSession=sessionRedisTemplate.opsForValue().get(token);
 
-        // Check if the session exists and if the user role is "merchant"
         return userSession;
     }
     @Transactional
@@ -65,7 +71,6 @@ public class PaymentService {
         payment.setStatus(PaymentStatus.PENDING);
         payment.setTransactionDate(LocalDateTime.now());
 
-        // Save initially as PENDING
         payment = paymentRepository.save(payment);
 
         try {
@@ -101,6 +106,11 @@ public class PaymentService {
 
                 );
 
+                OrderMessage message = new OrderMessage();
+                message.setToken(token);
+                message.setTransactionId(payment.getId());
+
+                rabbitTemplate.convertAndSend(orderQueue, message);
             }
 
 
@@ -138,4 +148,38 @@ public class PaymentService {
         return paymentRepository.findByUserId(userId);
     }
 
+    public Page<Payment> getPaymentHistory(Pageable pageable) {
+        return paymentRepository.findAll(pageable);
+    }
+    @Transactional
+    public void refundPayment(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found"));
+
+
+        if (payment.getStatus() == PaymentStatus.REFUNDED) {
+            throw new RuntimeException("Payment has already been refunded");
+        }
+        if (payment.getStatus() != PaymentStatus.SUCCESSFUL) {
+            throw new RuntimeException("Only successful payments can be refunded");
+        }
+        userServiceClient.deposit(payment.getUserId(),payment.getAmount());
+        payment.setStatus(PaymentStatus.SUCCESSFUL);
+        paymentRepository.save(payment);
+
+    }
+
+    @Transactional
+    public Payment cancelPayment(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found"));
+
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            throw new RuntimeException("Only pending payments can be cancelled");
+        }
+
+        payment = paymentRepository.save(payment);
+
+        return payment;
+    }
 }

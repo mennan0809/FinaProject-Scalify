@@ -6,6 +6,8 @@ import com.ecommerce.PaymentService.models.PaymentRequest;
 import com.ecommerce.PaymentService.models.enums.PaymentMethod;
 import com.ecommerce.PaymentService.models.enums.PaymentStatus;
 import com.ecommerce.PaymentService.services.PaymentService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -122,5 +124,33 @@ public class PaymentController {
         }
     }
 
-}
+    @GetMapping("/history")
+    public ResponseEntity<?> getPaymentHistory(Pageable pageable) {
+        try {
+            Page<Payment> paymentHistory = paymentService.getPaymentHistory(pageable);
+            return ResponseEntity.ok(paymentHistory);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error retrieving payment history: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @PostMapping("/{id}/refund")
+    public ResponseEntity<?> refundPayment(@PathVariable Long id) {
+        try {
+            paymentService.refundPayment(id);
+            return ResponseEntity.ok("Refund processed successfully.");
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error refunding payment: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
 
+    // Cancel payment
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<?> cancelPayment(@PathVariable Long id) {
+        try {
+            Payment canceledPayment = paymentService.cancelPayment(id);
+            return ResponseEntity.ok(canceledPayment);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error canceling payment: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+}
