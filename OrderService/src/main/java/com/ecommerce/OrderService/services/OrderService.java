@@ -1,17 +1,23 @@
 package com.ecommerce.OrderService.services;
 
+import com.ecommerce.OrderService.Clients.PaymentServiceFeignClient;
+import com.ecommerce.OrderService.Clients.ProductServiceFeignClient;
 import com.ecommerce.OrderService.Dto.*;
 import com.ecommerce.OrderService.models.Cart;
 import com.ecommerce.OrderService.models.CartItem;
 import com.ecommerce.OrderService.models.Order;
+import com.ecommerce.OrderService.models.RefundRequest;
 import com.ecommerce.OrderService.models.enums.OrderStatus;
+import com.ecommerce.OrderService.models.enums.RefundRequestStatus;
 import com.ecommerce.OrderService.repositories.OrderRepository;
-import com.ecommerce.OrderService.services.command.CancelOrderCommand;
-import com.ecommerce.OrderService.services.command.DeliverOrderCommand;
-import com.ecommerce.OrderService.services.command.OrderCommandExecutor;
-import com.ecommerce.OrderService.services.command.ShipOrderCommand;
+import com.ecommerce.OrderService.repositories.RefundRepository;
+import com.ecommerce.OrderService.services.command.*;
+import com.ecommerce.OrderService.services.observer.EmailNotificationObserver;
+import com.ecommerce.OrderService.services.observer.OrderStatusSubject;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,26 +34,41 @@ public class OrderService {
     private static final String ROLE_ADMIN = "ADMIN";
 
     private final OrderRepository orderRepository;
+    private final RedisTemplate<String, Cart> cartRedisTemplate;
+    private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
+    private final OrderStatusSubject orderStatusSubject;
+    private final EmailNotificationObserver emailNotificationObserver;
     private final CartService cartService;
+    private final RefundRepository refundRepository;
+    private final ProductServiceFeignClient productServiceFeignClient;
+    private final PaymentServiceFeignClient paymentServiceFeignClient;
 
     @Autowired
     public OrderService(
-            OrderRepository orderRepository,
-            CartService cartService) {
+            @Qualifier("cartRedisTemplate") RedisTemplate<String, Cart> cartRedisTemplate,
+            @Qualifier("userSessionDTORedisTemplate") RedisTemplate<String, UserSessionDTO> sessionRedisTemplate,
+            OrderRepository orderRepository, OrderStatusSubject orderStatusSubject,
+            EmailNotificationObserver emailNotificationObserver, CartService cartService,
+            RefundRepository refundRepository, PaymentServiceFeignClient paymentServiceFeignClient, ProductServiceFeignClient productServiceFeignClient) {
+        this.cartRedisTemplate = cartRedisTemplate;
+        this.sessionRedisTemplate = sessionRedisTemplate;
         this.orderRepository = orderRepository;
+        this.orderStatusSubject = orderStatusSubject;
+        this.emailNotificationObserver = emailNotificationObserver;
         this.cartService = cartService;
+        this.refundRepository = refundRepository;
+        this.paymentServiceFeignClient = paymentServiceFeignClient;
+        this.productServiceFeignClient = productServiceFeignClient;
     }
 
     private UserSessionDTO getSession(String token) {
-        //get from cache
-        UserSessionDTO session = null;
+        UserSessionDTO session = sessionRedisTemplate.opsForValue().get(token);
         if (session == null) throw new RuntimeException("Session not found for token: " + token);
         return session;
     }
 
     private Cart getCart(String token) {
-        //get from cache
-        Cart cart = null;
+        Cart cart = cartRedisTemplate.opsForValue().get(token);
         if (cart == null) throw new RuntimeException("Cart not found for token: " + token);
         return cart;
     }
@@ -115,10 +136,10 @@ public class OrderService {
         existingOrder.setTotalItemCount(updatedOrder.getTotalItemCount());
 
         Order savedOrder = orderRepository.save(existingOrder);
+        if (statusChanged) orderStatusSubject.notifyObservers(savedOrder);
 
         return savedOrder;
     }
-
     public void deleteOrder(String token, Long orderId) {
         UserSessionDTO userSessionDTO = getSession(token);
         if (!userSessionDTO.getRole().equals(ROLE_MERCHANT) || !userSessionDTO.getRole().equals(ROLE_ADMIN)) {
@@ -148,9 +169,20 @@ public class OrderService {
         Order order = getOrderById(token, orderId);
         OrderCommandExecutor executor = new OrderCommandExecutor(Collections.singletonList(
                 new CancelOrderCommand(order, orderRepository)));
+
+        paymentServiceFeignClient.refundPayment(order.getTransactionId());
+        for (CartItem item : order.getOrderProducts()) {
+            productServiceFeignClient.addStock(
+                    item.getProductId(),
+                    item.getQuantity(),
+                    "Bearer " + token
+            );
+        }
+        executor.executeCommands();
+        updateOrderStatus(order);
     }
 
-    public void shipOrder(String token, Long orderId, java.sql.Date deliveryDate) {
+    public void shipOrder(String token, Long orderId, Date deliveryDate) {
         UserSessionDTO userSessionDTO = getSession(token);
         if (!userSessionDTO.getRole().equals(ROLE_MERCHANT)) {
             throw new RuntimeException("You are not allowed to update this order");
@@ -161,7 +193,9 @@ public class OrderService {
         executor.executeCommands();
         order.setDeliveryDate(deliveryDate);
         orderRepository.save(order);
+        updateOrderStatus(order);
     }
+
 
     public void deliverOrder(String token, Long orderId) {
         UserSessionDTO userSessionDTO = getSession(token);
@@ -174,6 +208,7 @@ public class OrderService {
         executor.executeCommands();
         order.setDeliveryDate(Date.valueOf(LocalDate.now()));
         orderRepository.save(order);
+        updateOrderStatus(order);
     }
 
     public String trackOrder(String token, Long orderId) {
@@ -193,5 +228,170 @@ public class OrderService {
             }
         }
     }
+
+    public void updateOrderStatus(Order order) {
+        orderStatusSubject.notifyObservers(order);
+    }
+
+    @Transactional
+    public void checkoutOrder(String token, PaymentMethodDTO paymentMethod, PaymentRequestDTO paymentRequest) {
+        UserSessionDTO userSessionDTO = getSession(token);
+        if (!"CUSTOMER".equals(userSessionDTO.getRole())) {
+            throw new RuntimeException("Unauthorized role");
+        }
+
+        Cart cart = getCart(token);
+
+        try {
+            for (CartItem item : cart.getItems().values()) {
+                productServiceFeignClient.removeStock(
+                        item.getProductId(),
+                        item.getQuantity(),
+                        "Bearer " + token // Include Bearer prefix
+                );
+            }
+
+            // If all stock updates succeed, proceed to payment
+            PaymentResponseDTO response = paymentServiceFeignClient.createPayment(
+                    cart.getUserId(),
+                    userSessionDTO.getEmail(),
+                    paymentMethod,
+                    cart.getTotalPrice(),
+                    paymentRequest,
+                    token
+            );
+            if(response.getStatus().equals(PaymentStatus.FAILED)){
+                for (CartItem item : cart.getItems().values()) {
+                    productServiceFeignClient.addStock(
+                            item.getProductId(),
+                            item.getQuantity(),
+                            "Bearer " + token // Include Bearer prefix
+                    );
+                }
+                throw new RuntimeException("Payment failed");
+            }
+
+        } catch (Exception ex) {
+            // If anything fails during stock removal or payment, rollback will happen due to @Transactional
+            throw new RuntimeException("Checkout failed: " + ex.getMessage(), ex);
+        }
+    }
+    public void returnStock(String token) {
+        UserSessionDTO userSessionDTO = getSession(token);
+        if (!"CUSTOMER".equals(userSessionDTO.getRole())) {
+            throw new RuntimeException("Unauthorized role");
+        }
+
+        Cart cart = getCart(token);
+
+        for (CartItem item : cart.getItems().values()) {
+            productServiceFeignClient.addStock(
+                    item.getProductId(),
+                    item.getQuantity(),
+                    "Bearer " + token // Include Bearer prefix
+            );
+        }
+    }
+
+    public void requestRefund(String token, Long orderId) {
+        UserSessionDTO session = getSession(token);
+        UserSessionDTO userSessionDTO = getSession(token);
+        if (!userSessionDTO.getRole().equals(ROLE_CUSTOMER)) {
+            throw new RuntimeException("You are not allowed to refund this order");
+        }
+
+        Order order = getOrderById(token, orderId);
+
+        if (!order.getUserId().equals(session.getUserId()))
+            throw new RuntimeException("Unauthorized refund attempt");
+        if (order.getStatus() == OrderStatus.REFUNDED)
+            throw new RuntimeException("Order already refunded");
+
+        RefundRequest refundRequest = new RefundRequest(session.getUserId(), order.getMerchantId(), order, RefundRequestStatus.PENDING);
+        refundRepository.save(refundRequest);
+
+        order.setStatus(OrderStatus.REFUND_PENDING);
+        orderRepository.save(order);
+        log.info("Refund requested for orderId: {}", orderId);
+    }
+
+    public void rejectRefund(String token, Long orderId) {
+        UserSessionDTO userSessionDTO = getSession(token);
+        if (!userSessionDTO.getRole().equals(ROLE_MERCHANT)) {
+            throw new RuntimeException("You are not allowed to reject this refund Request");
+        }
+
+        Order order = getOrderById(token, orderId);
+
+        // Validate refund request exists
+        RefundRequest refundRequest = order.getRefundRequest();
+        if (refundRequest == null || refundRequest.getId() == null) {
+            throw new IllegalStateException("Refund request not found for order: " + orderId);
+        }
+
+        // Fetch refund from DB
+        RefundRequest request = refundRepository.findById(refundRequest.getId())
+                .orElseThrow(() -> new IllegalStateException("RefundRequest not found"));
+
+        // Update status
+        request.setStatus(RefundRequestStatus.REJECTED);
+        refundRepository.save(request);
+
+        order.setStatus(OrderStatus.DELIVERED);
+        orderRepository.save(order);
+
+        updateOrderStatus(order);
+    }
+
+    public List<RefundRequest> getRefundRequests(String token) {
+        UserSessionDTO session = getSession(token);
+
+        switch (session.getRole().toUpperCase()) {
+            case "MERCHANT":
+                return refundRepository.findByMerchantId(session.getUserId());
+
+            case "CUSTOMER":
+                return refundRepository.findByUserId(session.getUserId());
+
+            case "ADMIN":
+                return refundRepository.findAll();
+
+            default:
+                throw new IllegalArgumentException("Invalid user role: " + session.getRole());
+        }
+    }
+
+    public void refundOrder(String token, Long orderId) {
+        UserSessionDTO userSessionDTO = getSession(token);
+        if (!userSessionDTO.getRole().equals(ROLE_MERCHANT)) {
+            throw new RuntimeException("You are not allowed to accept this refund Request");
+        }
+        Order order = getOrderById(token, orderId);
+
+        // Execute the refund command
+        OrderCommandExecutor executor = new OrderCommandExecutor(Collections.singletonList(
+                new RefundOrderCommand(order, orderRepository)));
+        executor.executeCommands();
+
+        // Validate refund request exists
+        RefundRequest refundRequest = order.getRefundRequest();
+        if (refundRequest == null || refundRequest.getId() == null) {
+            throw new IllegalStateException("Refund request not found for order: " + orderId);
+        }
+
+
+        // Fetch refund from DB
+        RefundRequest request = refundRepository.findById(refundRequest.getId())
+                .orElseThrow(() -> new IllegalStateException("RefundRequest not found"));
+
+        paymentServiceFeignClient.refundPayment(order.getTransactionId());
+        // Update status
+        request.setStatus(RefundRequestStatus.ACCEPTED);
+        refundRepository.save(request);
+
+        // Update order status if needed
+        updateOrderStatus(order);
+    }
+
 
 }
