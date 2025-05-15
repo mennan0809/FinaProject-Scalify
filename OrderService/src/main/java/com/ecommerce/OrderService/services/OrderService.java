@@ -6,11 +6,17 @@ import com.ecommerce.OrderService.models.CartItem;
 import com.ecommerce.OrderService.models.Order;
 import com.ecommerce.OrderService.models.enums.OrderStatus;
 import com.ecommerce.OrderService.repositories.OrderRepository;
+import com.ecommerce.OrderService.services.command.CancelOrderCommand;
+import com.ecommerce.OrderService.services.command.DeliverOrderCommand;
+import com.ecommerce.OrderService.services.command.OrderCommandExecutor;
+import com.ecommerce.OrderService.services.command.ShipOrderCommand;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.*;
 
 @Slf4j
@@ -135,6 +141,56 @@ public class OrderService {
 
             default:
                 throw new IllegalArgumentException("Invalid user role: " + session.getRole());
+        }
+    }
+
+    public void cancelOrder(String token, Long orderId) {
+        Order order = getOrderById(token, orderId);
+        OrderCommandExecutor executor = new OrderCommandExecutor(Collections.singletonList(
+                new CancelOrderCommand(order, orderRepository)));
+    }
+
+    public void shipOrder(String token, Long orderId, java.sql.Date deliveryDate) {
+        UserSessionDTO userSessionDTO = getSession(token);
+        if (!userSessionDTO.getRole().equals(ROLE_MERCHANT)) {
+            throw new RuntimeException("You are not allowed to update this order");
+        }
+        Order order = getOrderById(token, orderId);
+        OrderCommandExecutor executor = new OrderCommandExecutor(Collections.singletonList(
+                new ShipOrderCommand(order, orderRepository)));
+        executor.executeCommands();
+        order.setDeliveryDate(deliveryDate);
+        orderRepository.save(order);
+    }
+
+    public void deliverOrder(String token, Long orderId) {
+        UserSessionDTO userSessionDTO = getSession(token);
+        if (!userSessionDTO.getRole().equals(ROLE_MERCHANT)) {
+            throw new RuntimeException("You are not allowed to update this order");
+        }
+        Order order = getOrderById(token, orderId);
+        OrderCommandExecutor executor = new OrderCommandExecutor(Collections.singletonList(
+                new DeliverOrderCommand(order, orderRepository)));
+        executor.executeCommands();
+        order.setDeliveryDate(Date.valueOf(LocalDate.now()));
+        orderRepository.save(order);
+    }
+
+    public String trackOrder(String token, Long orderId) {
+        Order order = getOrderById(token, orderId);
+        switch (order.getStatus()) {
+            case DELIVERED -> {
+                return "Order Status: " + order.getStatus() + " .It was Delivered on " + order.getDeliveryDate();
+            }
+            case SHIPPED -> {
+                return "Order Status: " + order.getStatus() + " .It will be Delivered on " + order.getDeliveryDate();
+            }
+            case CONFIRMED -> {
+                return "Order Status: " + order.getStatus() + " .Delivery Date will be determined upon Shipment!";
+            }
+            default -> {
+                return "Order Status: " + order.getStatus();
+            }
         }
     }
 
