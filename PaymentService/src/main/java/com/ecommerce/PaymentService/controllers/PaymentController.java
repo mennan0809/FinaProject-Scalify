@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/payment")
 public class PaymentController {
@@ -87,5 +89,38 @@ public class PaymentController {
             return new ResponseEntity<>("Error deleting payment: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
+    // Get payment by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getPayment(@PathVariable Long id) {
+        try {
+            Payment payment = paymentService.getPaymentById(id);
+            return payment != null ? ResponseEntity.ok(payment) : new ResponseEntity<>("Payment not found", HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error retrieving payment: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    // Get user payments
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getUserPayments(@PathVariable Long userId) {
+        try {
+            List<Payment> payments = paymentService.getUserPayments(userId);
+            return ResponseEntity.ok(payments);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error retrieving user payments: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @GetMapping("/status/{status}")
+    public ResponseEntity<?> getPaymentsByStatus(@PathVariable PaymentStatus status) {
+        try {
+            List<Payment> payments = paymentService.getPaymentsByStatus(status);
+            return ResponseEntity.ok(payments);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error retrieving payments by status: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
 }
 
