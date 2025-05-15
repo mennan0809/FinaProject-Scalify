@@ -5,8 +5,12 @@ import com.ecommerce.OrderService.services.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.ecommerce.OrderService.Dto.PaymentMethodDTO;
+import com.ecommerce.OrderService.Dto.PaymentRequestDTO;
+import com.ecommerce.OrderService.models.RefundRequest;
 
 import java.sql.Date;
+import java.util.List;
 
 @RestController
 @RequestMapping("/orders")
@@ -120,6 +124,62 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.OK).body(trackingInfo);
         } catch (Exception e) {
             return new ResponseEntity<>("Error tracking order: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/checkoutOrder")
+    public ResponseEntity<String> checkoutOrder(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestParam PaymentMethodDTO paymentMethod,
+            @RequestBody PaymentRequestDTO paymentRequestDTO
+    ) {
+        try {
+            extractToken(authorizationHeader);
+            orderService.checkoutOrder(extractToken(authorizationHeader), paymentMethod, paymentRequestDTO);
+            return ResponseEntity.ok("Order checkout initiated successfully.");
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error initiating order checkout: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    // Refund Order API
+    @PostMapping("/acceptRefund/{orderId}")
+    public ResponseEntity<String> refundOrder(@RequestHeader("Authorization") String token, @PathVariable Long orderId) {
+        try {
+            orderService.refundOrder(extractToken(token), orderId);
+            return ResponseEntity.status(HttpStatus.OK).body("Order refunded successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error refunding order: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/rejectRefund/{orderId}")
+    public ResponseEntity<String> rejectRefund(@RequestHeader("Authorization") String token, @PathVariable Long orderId) {
+        try {
+            orderService.rejectRefund(extractToken(token), orderId);
+            return ResponseEntity.status(HttpStatus.OK).body("Order refund rejected successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error rejecting refund: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/refundRequests")
+    public ResponseEntity<?> refundRequests(@RequestHeader("Authorization") String token) {
+        try {
+            List<RefundRequest> refundRequests = orderService.getRefundRequests(extractToken(token));
+            return ResponseEntity.status(HttpStatus.OK).body(refundRequests);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error fetching refund requests: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/requestRefund/{orderId}")
+    public ResponseEntity<String> requestRefund(@RequestHeader("Authorization") String token, @PathVariable Long orderId) {
+        try {
+            orderService.requestRefund(extractToken(token), orderId);
+            return ResponseEntity.status(HttpStatus.OK).body("Refund request submitted successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error requesting refund: " + e.getMessage());
         }
     }
 

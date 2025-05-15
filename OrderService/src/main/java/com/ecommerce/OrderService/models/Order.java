@@ -44,7 +44,10 @@ public class Order {
 
     @Column(nullable = true)
     private Long transactionId;
-    
+
+    @OneToOne(mappedBy = "order")
+    @JsonIgnoreProperties("order")  // prevents serializing the back-reference
+    private RefundRequest refundRequest;
     // Getters and Setters
     public Long getId() {
         return id;
@@ -120,6 +123,15 @@ public class Order {
 
     public void setDeliveryDate(Date deliveryDate) {
         this.deliveryDate = deliveryDate;
+    }
+
+    // Getter and Setter for refundRequest
+    public RefundRequest getRefundRequest() {
+        return refundRequest;
+    }
+
+    public void setRefundRequest(RefundRequest refundRequest) {
+        this.refundRequest = refundRequest;
     }
 
     // Helper method to calculate the total price and item count based on order products

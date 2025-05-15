@@ -9,25 +9,32 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 @Service
 public class CartService {
 
     private static final String ROLE_CUSTOMER = "CUSTOMER";
 
+    private final RedisTemplate<String, Cart> cartRedisTemplate;
+    private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
     private final ProductServiceFeignClient productServiceFeignClient;
 
     @Autowired
     public CartService(
+            @Qualifier("cartRedisTemplate") RedisTemplate<String, Cart> cartRedisTemplate,
+            @Qualifier("userSessionDTORedisTemplate") RedisTemplate<String, UserSessionDTO> sessionRedisTemplate,
             ProductServiceFeignClient productServiceFeignClient
     ) {
+        this.cartRedisTemplate = cartRedisTemplate;
+        this.sessionRedisTemplate = sessionRedisTemplate;
         this.productServiceFeignClient = productServiceFeignClient;
     }
 
 
     public UserSessionDTO getSession(String token) {
         // Fetch the session for the token
-        //get from cache
-        UserSessionDTO session = null;
+        UserSessionDTO session = sessionRedisTemplate.opsForValue().get(token);
         if (session == null) {
             throw new RuntimeException("Session not found in cache for token: " + token);
         }
@@ -52,8 +59,7 @@ public class CartService {
         Long userId = session.getUserId();
         String email = session.getEmail();
 
-        //get from cache
-        Cart cart = null;
+        Cart cart = cartRedisTemplate.opsForValue().get(token);
         if (cart == null) {
             cart = new Cart(userId, email);
         } else {
@@ -64,20 +70,18 @@ public class CartService {
         cart.addItem(productId, quantity, product.getPrice(), product.getMerchantId());
 
         // Save the updated cart back to Redis
-        //cache
+        cartRedisTemplate.opsForValue().set(token, cart);
     }
 
     public Cart viewCart(String token) {
         UserSessionDTO session = getSession(token);
-        //cache
-        Cart cart = null;
+        Cart cart = cartRedisTemplate.opsForValue().get(token);
         return cart != null ? cart : new Cart(session.getUserId(), session.getEmail());
     }
 
     public void removeItemFromCart(String token, Long productId, Integer quantity) {
         UserSessionDTO session = getSession(token);
-        //cache
-        Cart cart = null;
+        Cart cart = cartRedisTemplate.opsForValue().get(token);
 
         if (cart != null) {
             if (quantity == null) {
@@ -100,7 +104,7 @@ public class CartService {
                 }
             }
             // Save updated cart back to Redis
-            //cache
+            cartRedisTemplate.opsForValue().set(token, cart);
         } else {
             throw new RuntimeException("Cart not found for token: " + token);
         }
@@ -110,6 +114,6 @@ public class CartService {
     public void clearCart(String token) {
         // Delete the cart from Redis
         UserSessionDTO session = getSession(token);
-        //cache
+        cartRedisTemplate.delete(token);
     }
 }
