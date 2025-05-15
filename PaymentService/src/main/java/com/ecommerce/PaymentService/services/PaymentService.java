@@ -25,6 +25,8 @@ import java.util.UUID;
 public class PaymentService {
     private final PaymentRepository paymentRepository;
 
+    @Autowired
+    private MailService mailService;
     private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
     @Autowired
     private PaymentStrategyFactory paymentStrategyFactory;
@@ -67,7 +69,39 @@ public class PaymentService {
         payment = paymentRepository.save(payment);
 
         try {
-            paymentStrategyFactory.createPaymentStrategy(userId, token, method, paymentDetails);
+            PaymentStrategy strategy = paymentStrategyFactory.createPaymentStrategy(userId, token, method, paymentDetails);
+
+            boolean isSuccessful = strategy.processPayment(amount);
+
+            payment.setStatus(isSuccessful ? PaymentStatus.SUCCESSFUL : PaymentStatus.FAILED);
+            payment.setTransactionId(UUID.randomUUID().toString());
+
+            if (payment.getStatus() == PaymentStatus.FAILED) {
+                mailService.sendEmail(user.getEmail(),
+                        "Payment Failed",
+                        "Dear Customer,\n\n"
+                                + "We regret to inform you that your payment of $" + amount + " could not be processed successfully.\n"
+                                + "Transaction ID: " + payment.getTransactionId() + "\n\n"
+                                + "Please ensure you have sufficient balance or try again later. If the issue persists, contact support.\n\n"
+                                + "Thank you,\n"
+                                + "E-commerce Support Team"
+
+                );
+            }
+            if (isSuccessful) {
+                mailService.sendEmail(
+                        user.getEmail(),
+                        "Payment Successful",
+                        "Dear Customer,\n\n"
+                                + "Your payment of $" + amount + " has been successfully processed.\n"
+                                + "Transaction ID: " + payment.getTransactionId() + "\n\n"
+                                + "Thank you for your purchase! If you have any questions or need further assistance, feel free to contact our support team.\n\n"
+                                + "Best regards,\n"
+                                + "E-commerce Support Team"
+
+                );
+
+            }
 
 
             return paymentRepository.save(payment);
@@ -97,4 +131,11 @@ public class PaymentService {
 
         paymentRepository.delete(payment);
     }
+    public List<Payment> getPaymentsByStatus(PaymentStatus status) {
+        return paymentRepository.findByStatus(status);
+    }
+    public List<Payment> getUserPayments(Long userId) {
+        return paymentRepository.findByUserId(userId);
+    }
+
 }
