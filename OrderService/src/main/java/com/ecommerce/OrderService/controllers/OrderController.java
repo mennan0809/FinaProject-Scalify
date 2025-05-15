@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.Date;
+
 @RestController
 @RequestMapping("/orders")
 public class OrderController {
@@ -80,4 +82,45 @@ public class OrderController {
             return new ResponseEntity<>("Error fetching all orders: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
+    @PostMapping("/ship/{orderId}")
+    public ResponseEntity<String> shipOrder(@RequestHeader("Authorization") String token, @PathVariable Long orderId, @RequestBody(required = false) Date deliveryDate) {
+        try {
+            orderService.shipOrder(extractToken(token), orderId, deliveryDate);
+            return ResponseEntity.status(HttpStatus.OK).body("Order shipped successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error shipping order: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/deliver/{orderId}")
+    public ResponseEntity<String> deliverOrder(@RequestHeader("Authorization") String token, @PathVariable Long orderId) {
+        try {
+            orderService.deliverOrder(extractToken(token), orderId);
+            return ResponseEntity.status(HttpStatus.OK).body("Order delivered successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error delivering order: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/cancel/{orderId}")
+    public ResponseEntity<String> cancelOrder(@RequestHeader("Authorization") String token, @PathVariable Long orderId) {
+        try {
+            orderService.cancelOrder(extractToken(token), orderId);
+            return ResponseEntity.status(HttpStatus.OK).body("Order cancelled successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error cancelling order: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/track/{orderId}")
+    public ResponseEntity<String> trackOrder(@RequestHeader("Authorization") String token, @PathVariable Long orderId) {
+        try {
+            String trackingInfo = orderService.trackOrder(extractToken(token), orderId);
+            return ResponseEntity.status(HttpStatus.OK).body(trackingInfo);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error tracking order: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
 }
