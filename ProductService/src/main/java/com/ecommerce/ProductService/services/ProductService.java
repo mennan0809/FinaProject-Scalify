@@ -23,14 +23,17 @@ public class ProductService {
     @Autowired
     private ProductRepository productRepository;
 
+    @Autowired
+    private ProductReviewRepository productReviewRepository;
+
     private final ProductSubject subject = new ProductSubject();
 
     private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
 
-
     @Autowired
-    public ProductService(RedisTemplate<String, UserSessionDTO> sessionRedisTemplate) {
+    public ProductService(StockAlertObserver observer, RedisTemplate<String, UserSessionDTO> sessionRedisTemplate) {
         this.sessionRedisTemplate = sessionRedisTemplate;
+        subject.registerObserver(observer);
     }
 
     public String getToken(String token) {
@@ -158,6 +161,11 @@ public class ProductService {
             }
         }
 
+        // Notify observers if subject is initialized
+        if (subject != null) {
+            subject.notifyObservers(alertEmail, updatedProduct);
+        }
+
         return productRepository.save(existingProduct);
     }
 
@@ -185,6 +193,10 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        if (subject != null) {
+            subject.notifyObservers(alertEmail,updatedProduct);
+        }
+
         return updatedProduct; // Return the updated product
     }
     public void removeStock(String alertEmail,Long id, int stock) {
@@ -202,7 +214,55 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        if (subject != null) {
+            subject.notifyObservers(alertEmail,updatedProduct);
+        }
 
+    }
+
+
+    public ProductReview addReview(Long productId, ProductReview incomingReview) {
+        if (!productRepository.existsById(productId)) {
+            throw new IllegalArgumentException("Product not found with ID: " + productId);
+        }
+
+        // Find existing ProductReview for this product (assuming 1 per product)
+        ProductReview reviewDoc = productReviewRepository.findByProductId(productId)
+                .stream().findFirst()
+                .orElseGet(() -> {
+                    ProductReview newReview = new ProductReview();
+                    newReview.setProductId(productId);
+                    return newReview;
+                });
+
+        // Append new reviews/ratings
+        if (incomingReview.getReviews() != null) {
+            reviewDoc.getReviews().addAll(incomingReview.getReviews());
+        }
+        if (incomingReview.getRatings() != null) {
+            reviewDoc.getRatings().addAll(incomingReview.getRatings());
+        }
+
+        return productReviewRepository.save(reviewDoc);
+    }
+
+
+    public List<ProductReview> getReviews(Long productId) {
+        return productReviewRepository.findByProductId(productId);
+    }
+
+    public double getAverageRating(Long productId) {
+        List<ProductReview> reviews = getReviews(productId);
+        if (reviews.isEmpty()) return 0.0;
+
+        return reviews.stream()
+                .flatMapToInt(review -> review.getRatings().stream().mapToInt(Integer::intValue))
+                .average()
+                .orElse(0.0);
+    }
+
+    public List<Product> filterProductsByPrice(double min, double max) {
+        return productRepository.findByPriceBetween(min, max);
     }
 
 }

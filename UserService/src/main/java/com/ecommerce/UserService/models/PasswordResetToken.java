@@ -1,7 +1,6 @@
 package com.ecommerce.UserService.models;
 
 import jakarta.persistence.*;
-
 import java.time.LocalDateTime;
 
 @Entity
