@@ -12,6 +12,8 @@ spec:
       labels:
         app: product-service
     spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
       containers:
         - name: product-service
           image: mennan0809/product-service:latest

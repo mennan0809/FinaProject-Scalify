@@ -12,6 +12,8 @@ spec:
       labels:
         app: order-service
     spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
       containers:
         - name: order-service
           image: mennan0809/order-service:latest

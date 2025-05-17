@@ -22,13 +22,13 @@ import java.util.Map;
 public class ProductService {
     @Autowired
     private ProductRepository productRepository;
-
     @Autowired
     private ProductReviewRepository productReviewRepository;
 
     private final ProductSubject subject = new ProductSubject();
 
     private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
+
 
     @Autowired
     public ProductService(StockAlertObserver observer, RedisTemplate<String, UserSessionDTO> sessionRedisTemplate) {
@@ -193,6 +193,7 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        // Notify observers (make sure subject is properly initialized)
         if (subject != null) {
             subject.notifyObservers(alertEmail,updatedProduct);
         }
@@ -214,6 +215,7 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        // Notify observers (make sure subject is properly initialized)
         if (subject != null) {
             subject.notifyObservers(alertEmail,updatedProduct);
         }
