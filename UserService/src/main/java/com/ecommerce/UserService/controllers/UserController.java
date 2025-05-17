@@ -4,6 +4,7 @@ import com.ecommerce.UserService.models.User;
 import com.ecommerce.UserService.models.UserSession;
 import com.ecommerce.UserService.models.enums.UserRole;
 import com.ecommerce.UserService.services.UserService;
+import com.ecommerce.UserService.services.UserSeederService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,9 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private UserSeederService userSeederService;
+
     // Helper method to extract the token from the Authorization header
     private String extractToken(String authorizationHeader) {
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
@@ -26,6 +30,10 @@ public class UserController {
         return null;
     }
 
+    @GetMapping("/seed")
+    public String seedUsers() {
+        return userSeederService.seedUsers();
+    }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestParam("role") UserRole role, @RequestBody Object userData) {
