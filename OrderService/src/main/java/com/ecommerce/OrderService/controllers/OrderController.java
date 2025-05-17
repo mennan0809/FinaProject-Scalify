@@ -1,6 +1,7 @@
 package com.ecommerce.OrderService.controllers;
 
 import com.ecommerce.OrderService.models.Order;
+import com.ecommerce.OrderService.services.OrderSeederService;
 import com.ecommerce.OrderService.services.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,11 +17,12 @@ import java.util.List;
 @RequestMapping("/orders")
 public class OrderController {
     private final OrderService orderService;
+    private final OrderSeederService orderSeederService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, OrderSeederService orderSeederService) {
         this.orderService = orderService;
+        this.orderSeederService = orderSeederService;
     }
-
     private String extractToken(String authorizationHeader) {
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
             return authorizationHeader.substring(7);
@@ -28,6 +30,18 @@ public class OrderController {
         return null;
     }
 
+    @GetMapping("/seed")
+    public ResponseEntity<String> seedOrders() {
+        try {
+            String result = orderSeederService.seedOrders();
+            return ResponseEntity.ok(result);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("❌ Error seeding orders: " + e.getMessage());
+        }
+    }
 
     // POST: Create a new order
     @PostMapping("/checkout")
