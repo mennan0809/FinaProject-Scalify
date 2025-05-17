@@ -22,13 +22,13 @@ import java.util.Map;
 public class ProductService {
     @Autowired
     private ProductRepository productRepository;
-
     @Autowired
     private ProductReviewRepository productReviewRepository;
 
     private final ProductSubject subject = new ProductSubject();
 
     private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
+
 
     @Autowired
     public ProductService(StockAlertObserver observer, RedisTemplate<String, UserSessionDTO> sessionRedisTemplate) {
@@ -193,6 +193,7 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        // Notify observers (make sure subject is properly initialized)
         if (subject != null) {
             subject.notifyObservers(alertEmail,updatedProduct);
         }
@@ -214,6 +215,7 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        // Notify observers (make sure subject is properly initialized)
         if (subject != null) {
             subject.notifyObservers(alertEmail,updatedProduct);
         }
@@ -221,31 +223,24 @@ public class ProductService {
     }
 
 
-    public ProductReview addReview(Long productId, ProductReview incomingReview) {
+    public ProductReview addReview(Long userId,Long productId, ProductReview incomingReview) {
         if (!productRepository.existsById(productId)) {
             throw new IllegalArgumentException("Product not found with ID: " + productId);
         }
 
-        // Find existing ProductReview for this product (assuming 1 per product)
-        ProductReview reviewDoc = productReviewRepository.findByProductId(productId)
-                .stream().findFirst()
-                .orElseGet(() -> {
-                    ProductReview newReview = new ProductReview();
-                    newReview.setProductId(productId);
-                    return newReview;
-                });
-
-        // Append new reviews/ratings
-        if (incomingReview.getReviews() != null) {
-            reviewDoc.getReviews().addAll(incomingReview.getReviews());
-        }
-        if (incomingReview.getRatings() != null) {
-            reviewDoc.getRatings().addAll(incomingReview.getRatings());
+        if (incomingReview.getRating() == null ) {
+            throw new IllegalArgumentException("Review must have rating");
         }
 
-        return productReviewRepository.save(reviewDoc);
+        boolean alreadyReviewed = productReviewRepository.existsByProductIdAndUserId(productId, userId);
+        if (alreadyReviewed) {
+            throw new IllegalStateException("User has already reviewed this product");
+        }
+        incomingReview.setUserId(userId);
+        incomingReview.setProductId(productId);
+
+        return productReviewRepository.save(incomingReview);
     }
-
 
     public List<ProductReview> getReviews(Long productId) {
         return productReviewRepository.findByProductId(productId);
@@ -253,12 +248,26 @@ public class ProductService {
 
     public double getAverageRating(Long productId) {
         List<ProductReview> reviews = getReviews(productId);
-        if (reviews.isEmpty()) return 0.0;
 
-        return reviews.stream()
-                .flatMapToInt(review -> review.getRatings().stream().mapToInt(Integer::intValue))
-                .average()
-                .orElse(0.0);
+        if (reviews == null || reviews.isEmpty()) {
+            return 0.0;
+        }
+
+        int totalRating = 0;
+        int numberOfReviews = 0;
+
+        for (ProductReview review : reviews) {
+            if (review.getRating() != null) {
+                totalRating += review.getRating();
+                numberOfReviews++;
+            }
+        }
+
+        if (numberOfReviews == 0) {
+            return 0.0;
+        }
+
+        return (double) totalRating / numberOfReviews;
     }
 
     public List<Product> filterProductsByPrice(double min, double max) {
