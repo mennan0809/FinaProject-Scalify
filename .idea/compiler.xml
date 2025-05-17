@@ -2,7 +2,7 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <annotationProcessing>
-      <profile name="Annotation profile for UserService" enabled="true">
+      <profile name="Annotation profile for PaymentService" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -11,8 +11,8 @@
         </processorPath>
         <module name="OrderService" />
         <module name="UserService" />
-        <module name="ProductService" />
         <module name="PaymentService" />
+        <module name="ProductService" />
       </profile>
     </annotationProcessing>
   </component>
