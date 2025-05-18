@@ -12,8 +12,6 @@ spec:
       labels:
         app: user-service
     spec:
-      nodeSelector:
-        kubernetes.io/arch: arm64
       containers:
         - name: user-service
           image: mennan0809/user-service:latest
