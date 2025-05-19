@@ -108,19 +108,30 @@ public class OrderService {
 
     public Order getOrderById(String token, Long orderId) {
         UserSessionDTO userSessionDTO = getSession(token);
-        Order order = orderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
+        System.out.println(userSessionDTO.getRole() + userSessionDTO.getUserId()+ " " + order.getUserId() + " " + order.getMerchantId());
+
         switch (userSessionDTO.getRole()) {
             case ROLE_CUSTOMER:
-                if (order.getUserId().equals(userSessionDTO.getUserId())) return order;
+                if (order.getUserId().equals(userSessionDTO.getUserId())) {
+                    return order;
+                } else {
+                    throw new RuntimeException("You don't have permission to access this order");
+                }
             case ROLE_MERCHANT:
-                if (order.getMerchantId().equals(userSessionDTO.getUserId())) return order;
+                if (order.getMerchantId().equals(userSessionDTO.getUserId())) {
+                    return order;
+                } else {
+                    throw new RuntimeException("You don't have permission to access this order");
+                }
             case ROLE_ADMIN:
                 return order;
             default:
                 throw new RuntimeException("You don't have permission to access this order");
         }
-
     }
+
 
     public Order updateOrder(String token, Long orderId, Order updatedOrder) {
         UserSessionDTO userSessionDTO = getSession(token);
@@ -170,8 +181,7 @@ public class OrderService {
         for (CartItem item : order.getOrderProducts()) {
             productServiceFeignClient.addStock(
                     item.getProductId(),
-                    item.getQuantity(),
-                    "Bearer " + token
+                    item.getQuantity()
             );
         }
         executor.executeCommands();
@@ -242,29 +252,39 @@ public class OrderService {
             for (CartItem item : cart.getItems().values()) {
                 productServiceFeignClient.removeStock(
                         item.getProductId(),
-                        item.getQuantity(),
-                        "Bearer " + token // Include Bearer prefix
+                        item.getQuantity()
                 );
             }
+            try {
 
-            // If all stock updates succeed, proceed to payment
-            PaymentResponseDTO response = paymentServiceFeignClient.createPayment(
-                    cart.getUserId(),
-                    userSessionDTO.getEmail(),
-                    paymentMethod,
-                    cart.getTotalPrice(),
-                    paymentRequest,
-                    token
-            );
-            if(response.getStatus().equals(PaymentStatus.FAILED)){
+                // If all stock updates succeed, proceed to payment
+                PaymentResponseDTO response = paymentServiceFeignClient.createPayment(
+                        cart.getUserId(),
+                        userSessionDTO.getEmail(),
+                        paymentMethod,
+                        cart.getTotalPrice(),
+                        paymentRequest,
+                        token
+                );
+                if (response.getStatus().equals(PaymentStatus.FAILED)) {
+                    for (CartItem item : cart.getItems().values()) {
+                        productServiceFeignClient.addStock(
+                                item.getProductId(),
+                                item.getQuantity()
+
+                        );
+                    }
+                    throw new RuntimeException("Payment failed");
+                }
+            } catch (Exception ex) {
                 for (CartItem item : cart.getItems().values()) {
                     productServiceFeignClient.addStock(
                             item.getProductId(),
-                            item.getQuantity(),
-                            "Bearer " + token // Include Bearer prefix
+                            item.getQuantity()
+
                     );
                 }
-                throw new RuntimeException("Payment failed");
+                throw new RuntimeException("Checkout failed: " + ex.getMessage(), ex);
             }
 
         } catch (Exception ex) {
@@ -283,8 +303,7 @@ public class OrderService {
         for (CartItem item : cart.getItems().values()) {
             productServiceFeignClient.addStock(
                     item.getProductId(),
-                    item.getQuantity(),
-                    "Bearer " + token // Include Bearer prefix
+                    item.getQuantity()
             );
         }
     }
@@ -302,9 +321,13 @@ public class OrderService {
             throw new RuntimeException("Unauthorized refund attempt");
         if (order.getStatus() == OrderStatus.REFUNDED)
             throw new RuntimeException("Order already refunded");
-        if(order.getRefundRequest()!=null){
+        if(order.getRefundRequest()!=null||order.getStatus().equals(OrderStatus.REFUND_PENDING)){
             throw new RuntimeException("Reefund request already set");
         }
+        if (!order.getStatus().equals(OrderStatus.DELIVERED)) {
+            throw new RuntimeException("Order can't be Refunded");
+        }
+
         RefundRequest refundRequest = new RefundRequest(session.getUserId(), order.getMerchantId(), order, RefundRequestStatus.PENDING);
         refundRepository.save(refundRequest);
 
