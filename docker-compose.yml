@@ -34,7 +34,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=product
       - SPRING_DATASOURCE_PASSWORD=password
       - SPRING_DATA_MONGODB_URI=mongodb://product-review-db:27017/product_reviews
-      - REDIS_HOST=redis-cache
+      - SPRING_REDIS_HOST=redis-cache
       - SPRING_REDIS_PORT=6379
     depends_on:
       - product-db
@@ -84,12 +84,14 @@ services:
     image: redis:latest
     ports:
       - "6380:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
     restart: always
 
   redis-cache:
     image: redis:latest
     ports:
       - "6381:6379"
+    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
     restart: always
 
   redisinsight:
@@ -141,4 +143,9 @@ services:
       - product-service
       - order-service
       - payment-service
+    environment:
+      - services.user-service.url=http://user-service:8080
+      - services.product-service.url=http://product-service:8080
+      - services.payment-service.url=http://payment-service:8080
+      - services.order-service.url=http://order-service:8080
     restart: always

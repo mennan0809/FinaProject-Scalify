@@ -14,8 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -59,6 +57,7 @@ public class PaymentService {
 
         return userSession;
     }
+
     @Transactional
     public Payment processPayment(String token, Long userId, String customerEmail,
                                   PaymentMethod method, double amount, Object... paymentDetails) {
@@ -122,10 +121,40 @@ public class PaymentService {
         }
     }
 
-
     public Payment getPaymentById(Long id) {
         return paymentRepository.findById(id).orElse(null);
     }
+
+    public List<Payment> getUserPayments(Long userId) {
+        return paymentRepository.findByUserId(userId);
+    }
+
+    public List<Payment> getPaymentHistory(String userRole,Long userId) {
+        switch (userRole.toUpperCase()) {
+            case "ADMIN":
+                return paymentRepository.findAll();
+
+            case "CUSTOMER":
+                return paymentRepository.findByUserId(userId);
+
+            default:
+                throw new IllegalArgumentException("Invalid user role: " + userRole);
+        }
+    }
+
+    public List<Payment> getPaymentsByStatus(String userRole,Long userId,PaymentStatus status) {
+        switch (userRole.toUpperCase()) {
+            case "ADMIN":
+                return paymentRepository.findByStatus(status);
+
+            case "CUSTOMER":
+                return paymentRepository.findByUserIdAndStatus(userId, status);
+
+            default:
+                throw new IllegalArgumentException("Invalid user role: " + userRole);
+        }
+    }
+
     @Transactional
     public Payment updatePaymentStatus(Long paymentId, PaymentStatus newStatus) {
         Payment payment = paymentRepository.findById(paymentId)
@@ -134,6 +163,7 @@ public class PaymentService {
         payment.setStatus(newStatus);
         return paymentRepository.save(payment);
     }
+
     @Transactional
     public void deletePayment(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
@@ -141,22 +171,14 @@ public class PaymentService {
 
         paymentRepository.delete(payment);
     }
-    public List<Payment> getPaymentsByStatus(PaymentStatus status) {
-        return paymentRepository.findByStatus(status);
-    }
-    public List<Payment> getUserPayments(Long userId) {
-        return paymentRepository.findByUserId(userId);
-    }
 
-    public Page<Payment> getPaymentHistory(Pageable pageable) {
-        return paymentRepository.findAll(pageable);
-    }
     @Transactional
     public void refundPayment(Long paymentId) {
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
-
-
+        String transactionId = "TXN-"+paymentId;
+        Payment payment = paymentRepository.findById(paymentId).orElseThrow();
+        if(payment==null){
+            new RuntimeException("Payment not found");
+        }
         if (payment.getStatus() == PaymentStatus.REFUNDED) {
             throw new RuntimeException("Payment has already been refunded");
         }
@@ -164,7 +186,7 @@ public class PaymentService {
             throw new RuntimeException("Only successful payments can be refunded");
         }
         userServiceClient.deposit(payment.getUserId(),payment.getAmount());
-        payment.setStatus(PaymentStatus.SUCCESSFUL);
+        payment.setStatus(PaymentStatus.REFUNDED);
         paymentRepository.save(payment);
 
     }
@@ -177,9 +199,8 @@ public class PaymentService {
         if (payment.getStatus() != PaymentStatus.PENDING) {
             throw new RuntimeException("Only pending payments can be cancelled");
         }
-
+        payment.setStatus(PaymentStatus.CANCELLED);
         payment = paymentRepository.save(payment);
-
         return payment;
     }
 }
