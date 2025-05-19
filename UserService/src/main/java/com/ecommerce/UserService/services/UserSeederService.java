@@ -29,11 +29,11 @@ public class UserSeederService {
 
         // === Customers ===
         CustomerProfile cust1 = new CustomerProfile("Customer1", "scalifyteam@gmail.com", "12345", "123 Customer St", "01000000001");
-        cust1.setWallet(10 + rand.nextDouble() * 990); // wallet 10-1000
+        cust1.setWallet(150 + rand.nextDouble() * 990); // wallet 10-1000
         CustomerProfile cust2 = new CustomerProfile("Customer2", "scalifyteam@gmail.com", "12345", "456 Customer St", "01000000002");
-        cust2.setWallet(10 + rand.nextDouble() * 990);
+        cust2.setWallet(150 + rand.nextDouble() * 990);
         CustomerProfile cust3 = new CustomerProfile("Customer3", "scalifyteam@gmail.com", "12345", "789 Customer St", "01000000003");
-        cust3.setWallet(10 + rand.nextDouble() * 990);
+        cust3.setWallet(150 + rand.nextDouble() * 990);
 
         // === Merchants ===
         MerchantProfile merch1 = new MerchantProfile("Merchant1", "scalifyteam@gmail.com", "12345", "Store One", "123 Merchant Ave");
