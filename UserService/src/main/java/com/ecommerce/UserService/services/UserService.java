@@ -33,14 +33,6 @@ public class UserService {
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
     @Autowired private RedisTemplate<String, UserSession> redisTemplate;
     @Autowired private JwtUtil jwtUtil;
-    @Autowired
-    private SessionManager sessionManager;
-
-    @PostConstruct
-    public void init() {
-        System.out.println("UserService init");
-
-    }
 
     private User getUserOrThrow(String token, Long id) {
         User user= userRepository.findById(id)
@@ -257,7 +249,7 @@ public class UserService {
         if (!user.getRole().equalsIgnoreCase("ADMIN") && !user.isEmailVerified()) {
             throw new IllegalStateException("Please verify your email before logging in.");
         }
-
+        System.out.println("SERVICEEE"+SessionManager.getInstance().getSessionByUserId(user.getId()));
         if (SessionManager.getInstance().getSessionByUserId(user.getId()) != null) {
             throw new IllegalStateException("User already logged in.");
         }
@@ -296,7 +288,7 @@ public class UserService {
 
         try {
             System.out.println("🧹 [banUser] Attempting to clear session for userId = " + id);
-            sessionManager.removeSessionByUserId(id);
+            SessionManager.getInstance().removeSessionByUserId(id);
             System.out.println("✅ [banUser] Session removed successfully for userId = " + id);
         } catch (Exception e) {
             System.out.println("⚠️ [banUser] Session removal failed or user wasn't logged in. Reason: " + e.getMessage());
