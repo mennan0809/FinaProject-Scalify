@@ -23,15 +23,15 @@ public class PaymentSeederService {
         }
 
         List<Payment> payments = new ArrayList<>();
-        double orderTotals = 650.0;
+        double orderTotals = 550.0;
 
-        payments.add(createPayment(1L, "TXN-2", PaymentStatus.FAILED, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(1), orderTotals));
-        payments.add(createPayment(1L, "TXN-1", PaymentStatus.REFUNDED, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(2), orderTotals));
+        payments.add(createPayment(1L, "TXN-1", PaymentStatus.FAILED, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(1), orderTotals));
+        payments.add(createPayment(1L, "TXN-2", PaymentStatus.REFUNDED, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(2), orderTotals));
 
         payments.add(createPayment(2L, "TXN-3", PaymentStatus.REFUNDED, PaymentMethod.WALLET, LocalDateTime.now().minusDays(2), orderTotals));
 
-        payments.add(createPayment(3L, "TXN-5", PaymentStatus.FAILED, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(3), orderTotals));
-        payments.add(createPayment(3L, "TXN-4", PaymentStatus.SUCCESSFUL, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(3), orderTotals));
+        payments.add(createPayment(3L, "TXN-4", PaymentStatus.FAILED, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(3), orderTotals));
+        payments.add(createPayment(3L, "TXN-5", PaymentStatus.SUCCESSFUL, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(3), orderTotals));
 
         payments.add(createPayment(4L, "TXN-6", PaymentStatus.SUCCESSFUL, PaymentMethod.WALLET, LocalDateTime.now().minusDays(4), orderTotals));
         payments.add(createPayment(5L, "TXN-7", PaymentStatus.SUCCESSFUL, PaymentMethod.CREDIT_CARD, LocalDateTime.now().minusDays(5), orderTotals));
