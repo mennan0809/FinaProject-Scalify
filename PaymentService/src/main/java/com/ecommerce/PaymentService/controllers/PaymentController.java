@@ -7,8 +7,6 @@ import com.ecommerce.PaymentService.models.enums.PaymentMethod;
 import com.ecommerce.PaymentService.models.enums.PaymentStatus;
 import com.ecommerce.PaymentService.services.PaymentSeederService;
 import com.ecommerce.PaymentService.services.PaymentService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;

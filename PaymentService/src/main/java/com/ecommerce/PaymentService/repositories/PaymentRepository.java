@@ -3,8 +3,6 @@ package com.ecommerce.PaymentService.repositories;
 
 import com.ecommerce.PaymentService.models.Payment;
 import com.ecommerce.PaymentService.models.enums.PaymentStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,5 +14,4 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByStatus(PaymentStatus status);
     List<Payment> findByUserIdAndStatus(Long userId, PaymentStatus status);
     List<Payment> findAll();
-    Page<Payment> findByUserId(Long userId, Pageable pageable);
 }
