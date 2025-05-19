@@ -65,6 +65,18 @@ public class UserService {
         }
     }
 
+    public String getUserEmailByID(Long id) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            return user.getEmail();
+        } else {
+            throw new IllegalArgumentException("User not found with id: " + id);
+        }
+    }
+
+
     @Transactional
     public User updateUser(Long id, Object updatedData, String token) {
         UserSession session = getSessionOrThrow(token);
@@ -178,10 +190,6 @@ public class UserService {
     public void resetPassword(String token, String newPassword) {
         PasswordResetToken resetToken = getValidPasswordResetToken(token);
         User user = resetToken.getUser();
-        UserSession session = getSessionOrThrow(token);
-        if (!user.getId().equals(session.getUserId())) {
-            throw new IllegalStateException("You are not to access this user info.");
-        }
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         passwordResetTokenRepository.delete(resetToken);
