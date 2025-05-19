@@ -186,27 +186,27 @@ public class UserController {
 
     @PutMapping("/ban/{id}")
     public ResponseEntity<String> banUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
+        System.out.println("💥 BAN REQUEST: Incoming ban for userId = " + id);
         try {
             String token = extractToken(authorizationHeader);
-            if (!isTokenValid(token)) {
-                return new ResponseEntity<>("Unauthorized - invalid token", HttpStatus.UNAUTHORIZED);
-            }
+            System.out.println("🔑 Extracted token: " + token);
 
             userService.banUser(id, token);
+
+            System.out.println("✅ User " + id + " has been successfully banned.");
             return new ResponseEntity<>("User banned", HttpStatus.OK);
         } catch (Exception e) {
+            System.out.println("❌ Ban failed for userId = " + id + " | Reason: " + e.getMessage());
+            e.printStackTrace(); // optional, useful in dev
             return new ResponseEntity<>("Ban failed: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
 
     @PutMapping("/unban/{id}")
     public ResponseEntity<String> unbanUser(@PathVariable Long id, @RequestHeader("Authorization") String authorizationHeader) {
         try {
             String token = extractToken(authorizationHeader);
-            if (!isTokenValid(token)) {
-                return new ResponseEntity<>("Unauthorized - invalid token", HttpStatus.UNAUTHORIZED);
-            }
-
             userService.unbanUser(id, token);
             return new ResponseEntity<>("User unbanned", HttpStatus.OK);
         } catch (Exception e) {
