@@ -96,7 +96,7 @@ public class PaymentController {
             if (userSession == null || "MERCHANT".equals(userSession.getRole())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers and admins can get payments.");
             }
-            Payment payment = paymentService.getPaymentById(id);
+            Payment payment = paymentService.getPaymentById(userSession.getUserId(),userSession.getRole(),id);
             return payment != null ? ResponseEntity.ok(payment) : new ResponseEntity<>("Payment not found", HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
             return new ResponseEntity<>("Error retrieving payment: " + e.getMessage(), HttpStatus.BAD_REQUEST);
@@ -185,14 +185,8 @@ public class PaymentController {
     }
 
     @PostMapping("/{id}/refund")
-    public ResponseEntity<?> refundPayment(@PathVariable Long id,
-                                           @RequestHeader("Authorization") String authorizationHeader) {
+    public ResponseEntity<?> refundPayment(@PathVariable Long id) {
         try {
-            String token = extractToken(authorizationHeader);
-            UserSessionDTO userSession = paymentService.getUserSessionFromToken(token);
-            if (userSession == null || "CUSTOMER".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only merchants and admins can refund payments.");
-            }
             paymentService.refundPayment(id);
             return ResponseEntity.ok("Refund processed successfully.");
         } catch (Exception e) {
