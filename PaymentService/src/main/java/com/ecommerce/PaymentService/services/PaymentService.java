@@ -131,13 +131,13 @@ public class PaymentService {
         return paymentRepository.findByUserId(userId);
     }
 
-    public Page<Payment> getPaymentHistory(String userRole,Long userId,Pageable pageable) {
+    public List<Payment> getPaymentHistory(String userRole,Long userId) {
         switch (userRole.toUpperCase()) {
             case "ADMIN":
-                return paymentRepository.findAll(pageable);
+                return paymentRepository.findAll();
 
             case "CUSTOMER":
-                return paymentRepository.findByUserId(userId, pageable);
+                return paymentRepository.findByUserId(userId);
 
             default:
                 throw new IllegalArgumentException("Invalid user role: " + userRole);

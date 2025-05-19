@@ -118,7 +118,7 @@ public class PaymentController {
 
     // Get payment history (admin)
     @GetMapping("/history")
-    public ResponseEntity<?> getPaymentHistory(Pageable pageable,
+    public ResponseEntity<?> getPaymentHistory(
                                                @RequestHeader("Authorization") String authorizationHeader) {
         try {
             String token = extractToken(authorizationHeader);
@@ -126,7 +126,7 @@ public class PaymentController {
             if (userSession == null || "MERCHANT".equals(userSession.getRole())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers and admins can view payment history.");
             }
-            Page<Payment> paymentHistory = paymentService.getPaymentHistory(userSession.getRole(),userSession.getUserId(),pageable);
+            List<Payment> paymentHistory = paymentService.getPaymentHistory(userSession.getRole(),userSession.getUserId());
             return ResponseEntity.ok(paymentHistory);
         } catch (Exception e) {
             return new ResponseEntity<>("Error retrieving payment history: " + e.getMessage(), HttpStatus.BAD_REQUEST);
