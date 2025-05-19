@@ -148,8 +148,8 @@ public class ProductController {
         try {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = productService.getUserSessionFromToken(token);
-            if (userSession == null || !"MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only merchants can add stock.");
+            if (userSession == null || !"CUSTOMER".equals(userSession.getRole())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add stock.");
             }
 
             productService.addStock(userSession.getEmail(), id, stock);
@@ -169,8 +169,8 @@ public class ProductController {
         try {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = productService.getUserSessionFromToken(token);
-            if (userSession == null || !"MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only merchants can remove stock.");
+            if (userSession == null || !"CUSTOMER".equals(userSession.getRole())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can remove stock.");
             }
 
             productService.removeStock(userSession.getEmail(), id, stock);
