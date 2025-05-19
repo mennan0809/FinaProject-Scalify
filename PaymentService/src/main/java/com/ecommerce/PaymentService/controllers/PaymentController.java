@@ -96,7 +96,7 @@ public class PaymentController {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = paymentService.getUserSessionFromToken(token);
             if (userSession == null || "MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add products.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers and admins can get payments.");
             }
             Payment payment = paymentService.getPaymentById(id);
             return payment != null ? ResponseEntity.ok(payment) : new ResponseEntity<>("Payment not found", HttpStatus.BAD_REQUEST);
@@ -124,7 +124,7 @@ public class PaymentController {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = paymentService.getUserSessionFromToken(token);
             if (userSession == null || "MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add products.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers and admins can view payment history.");
             }
             Page<Payment> paymentHistory = paymentService.getPaymentHistory(userSession.getRole(),userSession.getUserId(),pageable);
             return ResponseEntity.ok(paymentHistory);
@@ -141,7 +141,7 @@ public class PaymentController {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = paymentService.getUserSessionFromToken(token);
             if (userSession == null || "MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add products.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers and admins can get payment by status.");
             }
             List<Payment> payments = paymentService.getPaymentsByStatus(userSession.getRole(),userSession.getUserId(),status);
             return ResponseEntity.ok(payments);
@@ -160,7 +160,7 @@ public class PaymentController {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = paymentService.getUserSessionFromToken(token);
             if (userSession == null || !"ADMIN".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add products.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only admins can get payment by status.");
             }
             Payment payment = paymentService.updatePaymentStatus(id, status);
             return ResponseEntity.ok(payment);
@@ -177,7 +177,7 @@ public class PaymentController {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = paymentService.getUserSessionFromToken(token);
             if (userSession == null || "MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add products.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only admins can delete payment.");
             }
             paymentService.deletePayment(id);
             return ResponseEntity.noContent().build();
@@ -193,7 +193,7 @@ public class PaymentController {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = paymentService.getUserSessionFromToken(token);
             if (userSession == null || "CUSTOMER".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add products.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only merchants and admins can refund payments.");
             }
             paymentService.refundPayment(id);
             return ResponseEntity.ok("Refund processed successfully.");
@@ -209,7 +209,7 @@ public class PaymentController {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = paymentService.getUserSessionFromToken(token);
             if (userSession == null || "MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add products.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers and admins can cancel payments.");
             }
             Payment canceledPayment = paymentService.cancelPayment(id);
             return ResponseEntity.ok(canceledPayment);
