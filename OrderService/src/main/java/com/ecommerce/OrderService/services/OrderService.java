@@ -304,7 +304,9 @@ public class OrderService {
             throw new RuntimeException("Unauthorized refund attempt");
         if (order.getStatus() == OrderStatus.REFUNDED)
             throw new RuntimeException("Order already refunded");
-
+        if(order.getRefundRequest()!=null){
+            throw new RuntimeException("Reefund request already set");
+        }
         RefundRequest refundRequest = new RefundRequest(session.getUserId(), order.getMerchantId(), order, RefundRequestStatus.PENDING);
         refundRepository.save(refundRequest);
 
@@ -360,35 +362,59 @@ public class OrderService {
     }
 
     public void refundOrder(String token, Long orderId) {
+        System.out.println("Starting refund process for order ID: " + orderId + " with token: " + token);
+
         UserSessionDTO userSessionDTO = getSession(token);
+        System.out.println("User session retrieved. Role: " + userSessionDTO.getRole());
+
         if (userSessionDTO.getRole().equals(ROLE_CUSTOMER)) {
+            System.out.println("Unauthorized refund attempt by customer.");
             throw new RuntimeException("You are not allowed to accept this refund Request");
         }
+
         Order order = getOrderById(token, orderId);
+        System.out.println("Order retrieved: " + order);
 
         // Execute the refund command
+        System.out.println("Executing refund command...");
         OrderCommandExecutor executor = new OrderCommandExecutor(Collections.singletonList(
                 new RefundOrderCommand(order, orderRepository)));
         executor.executeCommands();
+        System.out.println("Refund command executed.");
 
         // Validate refund request exists
         RefundRequest refundRequest = order.getRefundRequest();
         if (refundRequest == null || refundRequest.getId() == null) {
+            System.out.println("Refund request not found for order: " + orderId);
             throw new IllegalStateException("Refund request not found for order: " + orderId);
         }
-
+        System.out.println("Refund request found: " + refundRequest);
 
         // Fetch refund from DB
+        System.out.println("Fetching refund request from DB with ID: " + refundRequest.getId());
         RefundRequest request = refundRepository.findById(refundRequest.getId())
-                .orElseThrow(() -> new IllegalStateException("RefundRequest not found"));
+                .orElseThrow(() -> {
+                    System.out.println("RefundRequest not found in DB.");
+                    return new IllegalStateException("RefundRequest not found");
+                });
+        System.out.println("RefundRequest fetched from DB: " + request);
 
+        // Call payment service
+        System.out.println("Calling payment service to refund payment with transaction ID: " + order.getTransactionId());
         paymentServiceFeignClient.refundPayment(order.getTransactionId(),"Bearer " +token);
-        // Update status
+        System.out.println("Payment refunded via payment service.");
+
+        // Update refund request status
         request.setStatus(RefundRequestStatus.ACCEPTED);
         refundRepository.save(request);
+        System.out.println("Refund request status updated to ACCEPTED and saved.");
 
         // Update order status if needed
+        System.out.println("Updating order status...");
         updateOrderStatus(order);
+        System.out.println("Order status updated.");
+
+        System.out.println("Refund process completed for order ID: " + orderId);
     }
 
 

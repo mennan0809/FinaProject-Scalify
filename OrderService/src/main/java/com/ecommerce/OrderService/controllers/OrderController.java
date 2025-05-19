@@ -5,6 +5,7 @@ import com.ecommerce.OrderService.services.OrderSeederService;
 import com.ecommerce.OrderService.services.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import com.ecommerce.OrderService.Dto.PaymentMethodDTO;
 import com.ecommerce.OrderService.Dto.PaymentRequestDTO;
@@ -157,6 +158,7 @@ public class OrderController {
     }
 
     // Refund Order API
+    @Transactional
     @PostMapping("/acceptRefund/{orderId}")
     public ResponseEntity<String> refundOrder(@RequestHeader("Authorization") String token, @PathVariable Long orderId) {
         try {
