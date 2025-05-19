@@ -1,5 +1,6 @@
 package com.ecommerce.ProductService.services;
 
+import com.ecommerce.ProductService.Clients.UserServiceFeignClient;
 import com.ecommerce.ProductService.Dto.UserSessionDTO;
 import com.ecommerce.ProductService.models.Product;
 import com.ecommerce.ProductService.models.ProductReview;
@@ -29,11 +30,14 @@ public class ProductService {
 
     private final RedisTemplate<String, UserSessionDTO> sessionRedisTemplate;
 
+    @Autowired
+    private UserServiceFeignClient userServiceFeignClient;
 
     @Autowired
-    public ProductService(StockAlertObserver observer, RedisTemplate<String, UserSessionDTO> sessionRedisTemplate) {
+    public ProductService(StockAlertObserver observer, RedisTemplate<String, UserSessionDTO> sessionRedisTemplate, UserServiceFeignClient userServiceFeignClient) {
         this.sessionRedisTemplate = sessionRedisTemplate;
         subject.registerObserver(observer);
+        this.userServiceFeignClient = userServiceFeignClient;
     }
 
     public String getToken(String token) {
@@ -182,7 +186,7 @@ public class ProductService {
         return productRepository.findById(id).orElseThrow();
     }
 
-    public Product addStock(String alertEmail,Long id, int stock) {
+    public Product addStock(Long id, int stock) {
         // Find the product by ID
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -193,6 +197,7 @@ public class ProductService {
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
 
+        String alertEmail= userServiceFeignClient.getUserEmailById(product.getMerchantId());
         // Notify observers (make sure subject is properly initialized)
         if (subject != null) {
             subject.notifyObservers(alertEmail,updatedProduct);
@@ -200,7 +205,7 @@ public class ProductService {
 
         return updatedProduct; // Return the updated product
     }
-    public void removeStock(String alertEmail,Long id, int stock) {
+    public void removeStock(Long id, int stock) {
         // Find the product by ID
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -214,6 +219,8 @@ public class ProductService {
 
         // Save the updated product to the database
         Product updatedProduct = productRepository.save(product);
+
+        String alertEmail= userServiceFeignClient.getUserEmailById(product.getMerchantId());
 
         // Notify observers (make sure subject is properly initialized)
         if (subject != null) {

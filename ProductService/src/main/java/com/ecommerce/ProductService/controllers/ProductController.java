@@ -142,17 +142,10 @@ public class ProductController {
     @PutMapping("/{id}/addstock")
     public ResponseEntity<?> addStock(
             @PathVariable Long id,
-            @RequestParam int stock,
-            @RequestHeader("Authorization") String authorizationHeader) {
+            @RequestParam int stock) {
 
         try {
-            String token = extractToken(authorizationHeader);
-            UserSessionDTO userSession = productService.getUserSessionFromToken(token);
-            if (userSession == null || !"CUSTOMER".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add stock.");
-            }
-
-            productService.addStock(userSession.getEmail(), id, stock);
+            productService.addStock(id, stock);
             return ResponseEntity.ok("Stock added successfully.");
 
         } catch (Exception e) {
@@ -163,17 +156,9 @@ public class ProductController {
     @PutMapping("/{id}/removestock")
     public ResponseEntity<?> removeStock(
             @PathVariable Long id,
-            @RequestParam int stock,
-            @RequestHeader("Authorization") String authorizationHeader) {
-
+            @RequestParam int stock) {
         try {
-            String token = extractToken(authorizationHeader);
-            UserSessionDTO userSession = productService.getUserSessionFromToken(token);
-            if (userSession == null || !"CUSTOMER".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can remove stock.");
-            }
-
-            productService.removeStock(userSession.getEmail(), id, stock);
+            productService.removeStock(id, stock);
             return ResponseEntity.ok("Stock removed successfully.");
 
         } catch (Exception e) {
