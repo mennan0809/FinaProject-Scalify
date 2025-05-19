@@ -128,16 +128,14 @@ public class OrderService {
             throw new RuntimeException("You are not allowed to update this order");
         }
         Order existingOrder = getOrderById(token, orderId);
-        boolean statusChanged = !existingOrder.getStatus().equals(updatedOrder.getStatus());
 
-        existingOrder.setStatus(updatedOrder.getStatus());
         existingOrder.setDeliveryDate(updatedOrder.getDeliveryDate());
 
         Order savedOrder = orderRepository.save(existingOrder);
-        if (statusChanged) orderStatusSubject.notifyObservers(savedOrder);
 
         return savedOrder;
     }
+    
     public void deleteOrder(String token, Long orderId) {
         UserSessionDTO userSessionDTO = getSession(token);
         if (!userSessionDTO.getRole().equals(ROLE_MERCHANT) && !userSessionDTO.getRole().equals(ROLE_ADMIN)) {
