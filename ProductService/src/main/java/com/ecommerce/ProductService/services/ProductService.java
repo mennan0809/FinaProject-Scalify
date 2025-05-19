@@ -64,39 +64,13 @@ public class ProductService {
                 throw new IllegalArgumentException("Product with name '" + name + "' already exists for this merchant.");
             }
 
-            Product newProduct = ProductFactory.createProduct(category);
-            newProduct.setName((String) input.get("name"));
-            newProduct.setPrice(Double.parseDouble(input.get("price").toString()));
-            newProduct.setBrand((String) input.get("brand"));
-            newProduct.setColor((String) input.get("color"));
-            newProduct.setMerchantId(merchantId);
-            newProduct.setStockLevel(Integer.parseInt(input.get("stockLevel").toString()));
-
-            // Specific attributes
-            if (newProduct instanceof Clothing) {
-                Clothing clothing = (Clothing) newProduct;
-                clothing.setDetails(
-                        (String) input.get("size"),
-                        (String) input.get("material"),
-                        (String) input.get("gender"),
-                        (String) input.get("season")
-                );
-            } else if (newProduct instanceof Accessory) {
-                Accessory accessory = (Accessory) newProduct;
-                accessory.setDetails(
-                        (String) input.get("type"),
-                        (String) input.get("material"),
-                        Boolean.parseBoolean(input.get("unisex").toString())
-                );
-            }
-
+            Product newProduct = ProductFactory.createProduct(category,merchantId,input);
             productRepository.save(newProduct);
             return newProduct;
         } catch (Exception e) {
             throw new RuntimeException("Error creating a new product from input: " + input, e);
         }
     }
-
     public List<Product> getAllProducts() {
         return productRepository.findAll();
     }
