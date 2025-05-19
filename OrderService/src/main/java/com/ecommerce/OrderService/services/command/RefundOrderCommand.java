@@ -16,11 +16,13 @@ public class RefundOrderCommand extends OrderCommand {
     @Override
     public void execute() {
         // Process refund logic here (for example, interact with a payment gateway)
+        System.out.println("Refund Order Command");
+        System.out.println(order.getStatus());
         if(!order.getStatus().equals(OrderStatus.DELIVERED)) {
             throw new RuntimeException("Order can't Be Refunded");
         }
         // Update order status to REFUNDED
         order.setStatus(OrderStatus.REFUNDED);
-        orderRepository.save(order);  // Persist the changes in DB
+        orderRepository.save(order);
     }
 }

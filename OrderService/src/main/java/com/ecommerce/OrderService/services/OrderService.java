@@ -304,7 +304,9 @@ public class OrderService {
             throw new RuntimeException("Unauthorized refund attempt");
         if (order.getStatus() == OrderStatus.REFUNDED)
             throw new RuntimeException("Order already refunded");
-
+        if(order.getRefundRequest()!=null){
+            throw new RuntimeException("Reefund request already set");
+        }
         RefundRequest refundRequest = new RefundRequest(session.getUserId(), order.getMerchantId(), order, RefundRequestStatus.PENDING);
         refundRepository.save(refundRequest);
 
@@ -361,9 +363,11 @@ public class OrderService {
 
     public void refundOrder(String token, Long orderId) {
         UserSessionDTO userSessionDTO = getSession(token);
+
         if (userSessionDTO.getRole().equals(ROLE_CUSTOMER)) {
             throw new RuntimeException("You are not allowed to accept this refund Request");
         }
+
         Order order = getOrderById(token, orderId);
 
         // Execute the refund command
@@ -377,13 +381,16 @@ public class OrderService {
             throw new IllegalStateException("Refund request not found for order: " + orderId);
         }
 
-
         // Fetch refund from DB
         RefundRequest request = refundRepository.findById(refundRequest.getId())
-                .orElseThrow(() -> new IllegalStateException("RefundRequest not found"));
+                .orElseThrow(() -> {
+                    return new IllegalStateException("RefundRequest not found");
+                });
 
+        // Call payment service
         paymentServiceFeignClient.refundPayment(order.getTransactionId(),"Bearer " +token);
-        // Update status
+
+        // Update refund request status
         request.setStatus(RefundRequestStatus.ACCEPTED);
         refundRepository.save(request);
 
