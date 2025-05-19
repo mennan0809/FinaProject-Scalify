@@ -176,8 +176,11 @@ public class PaymentService {
 
     @Transactional
     public void refundPayment(Long paymentId) {
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+        String transactionId = "TXN-"+paymentId;
+        Payment payment = paymentRepository.findById(paymentId).orElseThrow();
+        if(payment==null){
+            new RuntimeException("Payment not found");
+        }
         if (payment.getStatus() == PaymentStatus.REFUNDED) {
             throw new RuntimeException("Payment has already been refunded");
         }
