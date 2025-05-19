@@ -6,6 +6,7 @@ import com.ecommerce.UserService.repositories.PasswordResetTokenRepository;
 import com.ecommerce.UserService.repositories.UserRepository;
 import com.ecommerce.UserService.services.factory.UserFactory;
 import com.ecommerce.UserService.services.singleton.SessionManager;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -32,7 +33,14 @@ public class UserService {
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
     @Autowired private RedisTemplate<String, UserSession> redisTemplate;
     @Autowired private JwtUtil jwtUtil;
+    @Autowired
+    private SessionManager sessionManager;
 
+    @PostConstruct
+    public void init() {
+        System.out.println("UserService init");
+
+    }
 
     private User getUserOrThrow(String token, Long id) {
         User user= userRepository.findById(id)
@@ -41,6 +49,12 @@ public class UserService {
         if (!session.getRole().equalsIgnoreCase(ROLE_ADMIN)&&!user.getId().equals(session.getUserId())) {
             throw new IllegalStateException("You are not to access this user info.");
         }
+        return user;
+    }
+
+    private User getUserById(Long id) {
+        User user= userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
         return user;
     }
 
@@ -250,7 +264,6 @@ public class UserService {
 
         String token = jwtUtil.generateToken(user.getId(), user.getRole());
         UserSession session = new UserSession(token, user.getId(), user.getRole(), user.getEmail());
-        redisTemplate.opsForValue().set(token, session);
         SessionManager.getInstance().addSession(token, session);
 
         return token;
@@ -268,16 +281,32 @@ public class UserService {
 
     @Transactional
     public void banUser(Long id, String token) {
+        System.out.println("🚨 [banUser] Incoming ban request for userId = " + id + " with token = " + token);
+
         UserSession session = getSessionOrThrow(token);
+        System.out.println("🔑 [banUser] Session fetched. Acting userId = " + session.getUserId() + ", Role = " + session.getRole());
 
         if (!session.getRole().equalsIgnoreCase("ADMIN")) {
+            System.out.println("⛔ [banUser] Unauthorized ban attempt by userId = " + session.getUserId());
             throw new IllegalStateException("Only admins can ban users.");
         }
 
-        User user = getUserOrThrow(token, id);
+        User user = getUserById(id);
+        System.out.println("👤 [banUser] Target user loaded. userId = " + user.getId() + ", isBanned = " + user.isBanned());
+
+        try {
+            System.out.println("🧹 [banUser] Attempting to clear session for userId = " + id);
+            sessionManager.removeSessionByUserId(id);
+            System.out.println("✅ [banUser] Session removed successfully for userId = " + id);
+        } catch (Exception e) {
+            System.out.println("⚠️ [banUser] Session removal failed or user wasn't logged in. Reason: " + e.getMessage());
+        }
+
         user.setBanned(true);
         userRepository.save(user);
+        System.out.println("🔒 [banUser] User " + id + " has been banned and changes saved.");
     }
+
 
     @Transactional
     public void unbanUser(Long id, String token) {
@@ -287,7 +316,7 @@ public class UserService {
             throw new IllegalStateException("Only admins can unban users.");
         }
 
-        User user = getUserOrThrow(token, id);
+        User user = getUserById(id);
         user.setBanned(false);
         userRepository.save(user);
     }
