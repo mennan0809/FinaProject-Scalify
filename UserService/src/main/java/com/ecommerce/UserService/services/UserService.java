@@ -65,6 +65,18 @@ public class UserService {
         }
     }
 
+    public String getUserEmailByID(Long id) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            return user.getEmail();
+        } else {
+            throw new IllegalArgumentException("User not found with id: " + id);
+        }
+    }
+
+
     @Transactional
     public User updateUser(Long id, Object updatedData, String token) {
         UserSession session = getSessionOrThrow(token);

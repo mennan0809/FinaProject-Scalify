@@ -67,6 +67,17 @@ public class UserController {
         }
     }
 
+    @GetMapping("email/{id}")
+    public ResponseEntity<?> getUserEmail(@PathVariable Long id) {
+        try {
+            String userEmail = userService.getUserEmailByID(id);
+            return new ResponseEntity<>(userEmail, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error fetching user Email: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Object userData, @RequestHeader("Authorization") String authorizationHeader) {
