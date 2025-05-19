@@ -3,6 +3,8 @@ package com.ecommerce.ProductService.models;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 
+import java.util.Map;
+
 @Entity
 @DiscriminatorValue("clothing")
 public class Clothing extends Product {
@@ -15,6 +17,25 @@ public class Clothing extends Product {
         super();
     }
 
+    public static Clothing create(long merchantId, Map<String, Object> input) {
+        Clothing clothing = new Clothing();
+
+        // Set common attributes
+        clothing.setMerchantId(merchantId);
+        clothing.setName((String) input.get("name"));
+        clothing.setPrice((Double) input.get("price"));
+        clothing.setBrand((String) input.get("brand"));
+        clothing.setColor((String) input.get("color"));
+        clothing.setStockLevel((input.get("stockLevel") != null) ? (Integer) input.get("stockLevel") : 0);
+
+        // Set clothing-specific details
+        clothing.setSize((String) input.get("size"));
+        clothing.setMaterial((String) input.get("material"));
+        clothing.setGender((String) input.get("gender"));
+        clothing.setSeason((String) input.get("season"));
+
+        return clothing;
+    }
     // Clothing-specific setters
     public void setDetails(String size, String material, String gender, String season) {
         this.size = size;
