@@ -13,14 +13,12 @@ public interface ProductServiceFeignClient {
     @PutMapping("/products/{id}/addstock")
     void addStock(
             @PathVariable("id") Long id,
-            @RequestParam("stock") int stock,
-            @RequestHeader("Authorization") String authorizationHeader
+            @RequestParam("stock") int stock
     );
 
     @PutMapping("/products/{id}/removestock")
     void removeStock(
             @PathVariable("id") Long id,
-            @RequestParam("stock") int stock,
-            @RequestHeader("Authorization") String authorizationHeader
+            @RequestParam("stock") int stock
     );
 }

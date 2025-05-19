@@ -170,8 +170,7 @@ public class OrderService {
         for (CartItem item : order.getOrderProducts()) {
             productServiceFeignClient.addStock(
                     item.getProductId(),
-                    item.getQuantity(),
-                    "Bearer " + token
+                    item.getQuantity()
             );
         }
         executor.executeCommands();
@@ -242,8 +241,7 @@ public class OrderService {
             for (CartItem item : cart.getItems().values()) {
                 productServiceFeignClient.removeStock(
                         item.getProductId(),
-                        item.getQuantity(),
-                        "Bearer " + token // Include Bearer prefix
+                        item.getQuantity()
                 );
             }
 
@@ -260,8 +258,8 @@ public class OrderService {
                 for (CartItem item : cart.getItems().values()) {
                     productServiceFeignClient.addStock(
                             item.getProductId(),
-                            item.getQuantity(),
-                            "Bearer " + token // Include Bearer prefix
+                            item.getQuantity()
+
                     );
                 }
                 throw new RuntimeException("Payment failed");
@@ -283,8 +281,7 @@ public class OrderService {
         for (CartItem item : cart.getItems().values()) {
             productServiceFeignClient.addStock(
                     item.getProductId(),
-                    item.getQuantity(),
-                    "Bearer " + token // Include Bearer prefix
+                    item.getQuantity()
             );
         }
     }
