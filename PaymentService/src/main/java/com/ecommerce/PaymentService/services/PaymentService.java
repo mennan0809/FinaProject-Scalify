@@ -121,8 +121,12 @@ public class PaymentService {
         }
     }
 
-    public Payment getPaymentById(Long id) {
-        return paymentRepository.findById(id).orElse(null);
+    public Payment getPaymentById(Long userId,String userRole,Long id) {
+        Payment payment=paymentRepository.findById(id).orElse(null);
+        if(!payment.getUserId().equals(userId)&&userRole.equals("CUSTOMER")) {
+            throw new IllegalArgumentException("Unauthorized: customers can only get their payments.");
+        }
+        return payment;
     }
 
     public List<Payment> getUserPayments(Long userId) {
