@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class ProductService {
@@ -75,78 +76,98 @@ public class ProductService {
         return productRepository.findAll();
     }
 
-    public Product updateProduct(Long userId, String alertEmail, long uid, Product updatedProduct) {
+    public Product updateProduct(Long userId, String alertEmail, long uid, Object updatedData) {
         Product existingProduct = productRepository.findById(uid)
                 .orElseThrow(() -> new RuntimeException("Product not found with UID: " + uid));
 
         if (!existingProduct.getMerchantId().equals(userId)) {
-            throw new RuntimeException("Only the owner of Product can update it");
+            throw new RuntimeException("Only the owner of the product can update it");
         }
 
-        // Update common attributes if not null
-        if (updatedProduct.getName() != null) {
-            existingProduct.setName(updatedProduct.getName());
-        }
-        if (updatedProduct.getPrice() != 0.0) {
-            existingProduct.setPrice(updatedProduct.getPrice());
-        }
-        if (updatedProduct.getBrand() != null) {
-            existingProduct.setBrand(updatedProduct.getBrand());
-        }
-        if (updatedProduct.getColor() != null) {
-            existingProduct.setColor(updatedProduct.getColor());
-        }
-        if (updatedProduct.getMerchantId() != null) {
-            existingProduct.setMerchantId(updatedProduct.getMerchantId());
-        }
-        if (updatedProduct.getStockLevel() != 0) {
-            existingProduct.setStockLevel(updatedProduct.getStockLevel());
+        if (!(updatedData instanceof Map)) {
+            throw new IllegalArgumentException("Updated data is not a valid map.");
         }
 
-        // Handle specific attributes for different product types
-        if (existingProduct instanceof Clothing && updatedProduct instanceof Clothing) {
+        Map<String, Object> data = (Map<String, Object>) updatedData;
+
+        // Define clothing-specific and accessory-specific fields
+        Set<String> clothingFields = Set.of("size", "gender", "season");
+        Set<String> accessoryFields = Set.of("type", "unisex");
+
+        boolean hasClothingField = data.keySet().stream().anyMatch(clothingFields::contains);
+        boolean hasAccessoryField = data.keySet().stream().anyMatch(accessoryFields::contains);
+
+        // Check type and enforce no cross attributes
+        if (existingProduct instanceof Clothing) {
+            if (hasAccessoryField) {
+                throw new IllegalArgumentException("Accessory attributes provided for a Clothing product.");
+            }
+        } else if (existingProduct instanceof Accessory) {
+            if (hasClothingField) {
+                throw new IllegalArgumentException("Clothing attributes provided for an Accessory product.");
+            }
+        } else {
+            throw new IllegalArgumentException("Unknown product type.");
+        }
+
+        // Update common fields (same as before)
+        if (data.containsKey("name")) {
+            existingProduct.setName((String) data.get("name"));
+        }
+        if (data.containsKey("price")) {
+            existingProduct.setPrice(Double.parseDouble(data.get("price").toString()));
+        }
+        if (data.containsKey("brand")) {
+            existingProduct.setBrand((String) data.get("brand"));
+        }
+        if (data.containsKey("color")) {
+            existingProduct.setColor((String) data.get("color"));
+        }
+        if (data.containsKey("merchantId")) {
+            existingProduct.setMerchantId(Long.parseLong(data.get("merchantId").toString()));
+        }
+        if (data.containsKey("stockLevel")) {
+            existingProduct.setStockLevel(Integer.parseInt(data.get("stockLevel").toString()));
+        }
+
+        // Update specific fields
+        if (existingProduct instanceof Clothing) {
             Clothing clothing = (Clothing) existingProduct;
-            Clothing updatedClothing = (Clothing) updatedProduct;
 
-            if (updatedClothing.getSize() != null) {
-                clothing.setSize(updatedClothing.getSize());
+            if (data.containsKey("size")) {
+                clothing.setSize((String) data.get("size"));
             }
-            if (updatedClothing.getMaterial() != null) {
-                clothing.setMaterial(updatedClothing.getMaterial());
+            if (data.containsKey("material")) {
+                clothing.setMaterial((String) data.get("material"));
             }
-            if (updatedClothing.getGender() != null) {
-                clothing.setGender(updatedClothing.getGender());
+            if (data.containsKey("gender")) {
+                clothing.setGender((String) data.get("gender"));
             }
-            if (updatedClothing.getSeason() != null) {
-                clothing.setSeason(updatedClothing.getSeason());
+            if (data.containsKey("season")) {
+                clothing.setSeason((String) data.get("season"));
             }
-
-        } else if (existingProduct instanceof Accessory && updatedProduct instanceof Accessory) {
+        } else { // Accessory
             Accessory accessory = (Accessory) existingProduct;
-            Accessory updatedAccessory = (Accessory) updatedProduct;
 
-            if (updatedAccessory.getType() != null) {
-                accessory.setType(updatedAccessory.getType());
+            if (data.containsKey("type")) {
+                accessory.setType((String) data.get("type"));
             }
-            if (updatedAccessory.getMaterial() != null) {
-                accessory.setMaterial(updatedAccessory.getMaterial());
+            if (data.containsKey("material")) {
+                accessory.setMaterial((String) data.get("material"));
             }
-
-            // boolean can't be null — so we need a workaround
-            // Example: Assume `isUnisexSet()` is a custom method to know if the value is explicitly set
-            if (updatedAccessory.isUnisex() != accessory.isUnisex()) {
-                accessory.setUnisex(updatedAccessory.isUnisex());
+            if (data.containsKey("unisex")) {
+                accessory.setUnisex(Boolean.parseBoolean(data.get("unisex").toString()));
             }
         }
 
-        // Notify observers if subject is initialized
+        productRepository.save(existingProduct);
+
         if (subject != null) {
-            subject.notifyObservers(alertEmail, updatedProduct);
+            subject.notifyObservers(alertEmail, existingProduct);
         }
 
-        return productRepository.save(existingProduct);
+        return existingProduct;
     }
-
 
     public void deleteProduct(Long userId,Long id) {
         Product product=productRepository.findById(id).orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
@@ -250,9 +271,22 @@ public class ProductService {
 
         return (double) totalRating / numberOfReviews;
     }
+    public ProductReview editRating(Long userId, Integer newRating,Long productId) {
+        if (!productRepository.existsById(productId)) {
+            throw new IllegalArgumentException("Product not found with ID: " + productId);
+        }
 
+        if (!productReviewRepository.existsByProductIdAndUserId(productId, userId)) {
+            throw new IllegalArgumentException("You never reviewed this product");
+        }
+        ProductReview review = productReviewRepository.getProductReviewByProductIdAndUserId(productId, userId);
+
+        review.setRating(newRating);
+        return productReviewRepository.save(review);
+    }
     public List<Product> filterProductsByPrice(double min, double max) {
         return productRepository.findByPriceBetween(min, max);
     }
+
 
 }

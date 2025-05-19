@@ -93,7 +93,7 @@ public class ProductController {
     @PutMapping("/{id}")
     public ResponseEntity<?> updateProduct(
             @PathVariable Long id,
-            @RequestBody Product updatedProduct,
+            @RequestBody Object updatedData,
             @RequestHeader("Authorization") String authorizationHeader) {
 
         try {
@@ -103,14 +103,30 @@ public class ProductController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only merchants can update products.");
             }
 
-            Product product = productService.updateProduct(userSession.getUserId(), userSession.getEmail(), id, updatedProduct);
+            Product product = productService.updateProduct(userSession.getUserId(), userSession.getEmail(), id, updatedData);
             return ResponseEntity.ok(product);
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
         }
     }
+    @PutMapping("/editRating/{productId}")
+    public ResponseEntity<?> editRating(@PathVariable Long productId,@RequestParam Integer rating,
+                                        @RequestHeader("Authorization") String authorizationHeader) {
 
+        try {
+            String token = extractToken(authorizationHeader);
+            UserSessionDTO userSession = productService.getUserSessionFromToken(token);
+            if (userSession == null || !"CUSTOMER".equals(userSession.getRole())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can edit reviews.");
+            }
+
+            ProductReview avgRating = productService.editRating(userSession.getUserId(),rating,productId);
+            return ResponseEntity.ok(avgRating);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+        }
+    }
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteProduct(@PathVariable Long id,
                                            @RequestHeader("Authorization") String authorizationHeader) {

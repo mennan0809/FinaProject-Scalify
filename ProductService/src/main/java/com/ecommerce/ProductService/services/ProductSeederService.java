@@ -9,6 +9,7 @@ import com.ecommerce.ProductService.repositories.ProductReviewRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Random;
 
 @Service
 public class ProductSeederService {
@@ -33,7 +34,6 @@ public class ProductSeederService {
                 String productName = "Product-" + productCounter++;
 
                 if (i % 2 == 0) {
-                    // Even: Clothing
                     Clothing clothing = new Clothing();
                     clothing.setCommonAttributes(
                             productName, 150.0, "Zara",
@@ -42,7 +42,6 @@ public class ProductSeederService {
                     clothing.setDetails("M", "Cotton", "Male", "Winter");
                     product = productRepository.save(clothing);
                 } else {
-                    // Odd: Accessory
                     Accessory accessory = new Accessory();
                     accessory.setCommonAttributes(
                             productName, 250.0, "Gucci",
@@ -51,7 +50,6 @@ public class ProductSeederService {
                     accessory.setDetails("Ring", "Metal", true);
                     product = productRepository.save(accessory);
                 }
-
                 seedReview(product.getUid());
             }
         }
@@ -60,19 +58,23 @@ public class ProductSeederService {
     }
 
     private void seedReview(Long productId) {
+
+        if (reviewRepository.count() > 0) return;
         List<String> comments = List.of("Top quality.", "Perfect gift.");
         List<Integer> ratings = List.of(5, 4);
-        Long userId = 1L;  // Or random userId if you want
 
-        for (int i = 0; i < comments.size(); i++) {
-            ProductReview review = new ProductReview();
-            review.setProductId(productId);
-            review.setUserId(userId + i);  // just to differ userId maybe
-            review.setComment(comments.get(i));
-            review.setRating(ratings.get(i));
+        Random random = new Random();
 
-            reviewRepository.save(review);
-        }
+        int randomIndex = random.nextInt(comments.size());  // 0 or 1
+        int randomUserId = 1 + random.nextInt(3);            // 1, 2, or 3
+
+        ProductReview review = new ProductReview();
+        review.setProductId(productId);
+        review.setUserId((long) randomUserId);
+        review.setComment(comments.get(randomIndex));
+        review.setRating(ratings.get(randomIndex));
+
+        reviewRepository.save(review);
     }
 
 }
