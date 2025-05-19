@@ -4,6 +4,7 @@ import com.ecommerce.ProductService.Dto.UserSessionDTO;
 import com.ecommerce.ProductService.models.Product;
 import com.ecommerce.ProductService.models.ProductReview;
 import com.ecommerce.ProductService.models.enums.ProductCategory;
+import com.ecommerce.ProductService.services.ProductSeederService;
 import com.ecommerce.ProductService.services.ProductService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,9 +17,11 @@ import java.util.Map;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductSeederService productSeederService;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService, ProductSeederService productSeederService) {
         this.productService = productService;
+        this.productSeederService = productSeederService;
     }
 
     private boolean isMerchantUser(String token) {
@@ -31,6 +34,19 @@ public class ProductController {
             return authorizationHeader.substring(7);
         }
         return null;
+    }
+
+    @GetMapping("/seed")
+    public ResponseEntity<String> seedProducts() {
+        try {
+            String result = productSeederService.seedEverything();
+            return ResponseEntity.ok(result);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("❌ Error seeding products: " + e.getMessage());
+        }
     }
 
     @PostMapping
@@ -132,8 +148,8 @@ public class ProductController {
         try {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = productService.getUserSessionFromToken(token);
-            if (userSession == null || !"MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only merchants can add stock.");
+            if (userSession == null || !"CUSTOMER".equals(userSession.getRole())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add stock.");
             }
 
             productService.addStock(userSession.getEmail(), id, stock);
@@ -153,8 +169,8 @@ public class ProductController {
         try {
             String token = extractToken(authorizationHeader);
             UserSessionDTO userSession = productService.getUserSessionFromToken(token);
-            if (userSession == null || !"MERCHANT".equals(userSession.getRole())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only merchants can remove stock.");
+            if (userSession == null || !"CUSTOMER".equals(userSession.getRole())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can remove stock.");
             }
 
             productService.removeStock(userSession.getEmail(), id, stock);
@@ -179,7 +195,7 @@ public class ProductController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized: Only customers can add reviews.");
             }
 
-            ProductReview createdReview = productService.addReview(productId, review);
+            ProductReview createdReview = productService.addReview(userSession.getUserId(),productId, review);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdReview);
 
         } catch (Exception e) {
