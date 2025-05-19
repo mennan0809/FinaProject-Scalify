@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*;
 
 @FeignClient(name = "user-service", url = "http://user-service:8080")
 public interface UserServiceFeignClient {
-    @GetMapping("/email/{id}")
+    @GetMapping("users/email/{id}")
     String getUserEmailById(@PathVariable("id") Long id);
 }
 
